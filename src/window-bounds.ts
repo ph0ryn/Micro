@@ -5,26 +5,33 @@ import type { Point, Size } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 
-const windowBoundsScript = String.raw`
-function run(argv) {
-  const query = argv[0].toLowerCase();
+const findTargetScript = String.raw`
+function findTarget(appName) {
+  const query = appName.toLowerCase();
   const systemEvents = Application("System Events");
   const candidates = systemEvents.applicationProcesses.whose({ visible: true })()
     .filter((process) => process.name().toLowerCase().includes(query));
   const target = candidates.find((process) => process.frontmost()) ?? candidates[0];
 
   if (!target) {
-    throw new Error("Application not found: " + argv[0]);
+    throw new Error("Application not found: " + appName);
   }
 
-  const windows = target.windows();
-
-  if (windows.length === 0) {
+  if (target.windows().length === 0) {
     throw new Error("Window not found for application: " + target.name());
   }
 
-  const position = windows[0].position();
-  const size = windows[0].size();
+  return target;
+}
+`;
+
+const windowBoundsScript = String.raw`
+${findTargetScript}
+
+function run(argv) {
+  const target = findTarget(argv[0]);
+  const position = target.windows()[0].position();
+  const size = target.windows()[0].size();
 
   return JSON.stringify({
     origin: { x: position[0], y: position[1] },
@@ -34,20 +41,10 @@ function run(argv) {
 `;
 
 const focusWindowScript = String.raw`
+${findTargetScript}
+
 function run(argv) {
-  const query = argv[0].toLowerCase();
-  const systemEvents = Application("System Events");
-  const candidates = systemEvents.applicationProcesses.whose({ visible: true })()
-    .filter((process) => process.name().toLowerCase().includes(query));
-  const target = candidates.find((process) => process.frontmost()) ?? candidates[0];
-
-  if (!target) {
-    throw new Error("Application not found: " + argv[0]);
-  }
-
-  if (target.windows().length === 0) {
-    throw new Error("Window not found for application: " + target.name());
-  }
+  const target = findTarget(argv[0]);
 
   target.frontmost = true;
 }

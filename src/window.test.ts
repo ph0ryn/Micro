@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { Image } from "./image.ts";
 import { type Automation, Window } from "./window.ts";
 
 import type { Point } from "./types.ts";
@@ -29,16 +28,6 @@ const createAutomation = () => {
   const automation: Automation = {
     async click(): Promise<void> {
       calls.push(["click"]);
-    },
-    async find(image, searchBounds, confidence): Promise<Point> {
-      void image;
-
-      calls.push(["find", searchBounds, confidence]);
-
-      return {
-        x: 130,
-        y: 240,
-      };
     },
     async getCursor(): Promise<Point> {
       calls.push(["cursor"]);
@@ -155,56 +144,13 @@ describe("Window", () => {
     });
   });
 
-  test("finds an image within the window and returns a relative top-left point", async () => {
-    const { automation, calls } = createAutomation();
-    const window = new Window("Chrome", {
-      automation,
-      boundsProvider,
-    });
-    const image = new Image({
-      height: 20,
-      width: 40,
-    });
-
-    expect(await window.find(image, 0.9)).toEqual({
-      x: 30,
-      y: 40,
-    });
-
-    expect(calls).toEqual([["find", bounds, 0.9]]);
-  });
-
-  test("rejects invalid coordinates and confidence", async () => {
+  test("rejects invalid coordinates", async () => {
     const { automation } = createAutomation();
     const window = new Window("Chrome", {
       automation,
       boundsProvider,
     });
-    const image = new Image({
-      height: 20,
-      width: 40,
-    });
 
     expect(window.move({ x: 800, y: 0 }, 0)).rejects.toThrow("outside the window");
-    expect(window.find(image, 2)).rejects.toThrow("confidence must be between 0 and 1");
-  });
-});
-
-describe("Image", () => {
-  test("provides its size and center point", () => {
-    const image = new Image({
-      height: 21,
-      width: 41,
-    });
-
-    expect(image.size).toEqual({
-      height: 21,
-      width: 41,
-    });
-
-    expect(image.center).toEqual({
-      x: 20,
-      y: 10,
-    });
   });
 });

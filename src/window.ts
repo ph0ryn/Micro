@@ -1,10 +1,8 @@
-import type { Image } from "./image.ts";
 import type { Point } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
 
 export interface Automation {
   click(): Promise<void>;
-  find(image: Image, bounds: WindowBounds, confidence: number): Promise<Point>;
   getCursor(): Promise<Point>;
   mouseDown(): Promise<void>;
   mouseUp(): Promise<void>;
@@ -123,20 +121,6 @@ export class Window {
     return {
       x: cursor.x - bounds.origin.x,
       y: cursor.y - bounds.origin.y,
-    };
-  }
-
-  async find(image: Image, confidence = 0.99): Promise<Point> {
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-      throw new Error("confidence must be between 0 and 1");
-    }
-
-    const bounds = await this.boundsProvider.get(this.appName);
-    const absolute = await this.automation.find(image, bounds, confidence);
-
-    return {
-      x: absolute.x - bounds.origin.x,
-      y: absolute.y - bounds.origin.y,
     };
   }
 

@@ -1,17 +1,6 @@
-import {
-  Button,
-  Point as NutPoint,
-  Region,
-  loadImage as loadNutImage,
-  mouse,
-  screen,
-  straightTo,
-} from "@nut-tree-fork/nut-js";
-
-import { Image, unwrapImage } from "./image.ts";
+import { Button, Point as NutPoint, mouse, straightTo } from "@nut-tree-fork/nut-js";
 
 import type { Point } from "./types.ts";
-import type { WindowBounds } from "./window-bounds.ts";
 import type { Automation } from "./window.ts";
 
 const toNutPoint = (target: Point): NutPoint => new NutPoint(target.x, target.y);
@@ -32,23 +21,6 @@ const runMouseOperation = async <Result>(operation: () => Promise<Result>): Prom
 export const nutAutomation: Automation = {
   async click(): Promise<void> {
     await runMouseOperation(() => mouse.leftClick());
-  },
-
-  async find(image: Image, bounds: WindowBounds, confidence: number): Promise<Point> {
-    const region = await screen.find(unwrapImage(image) as never, {
-      confidence,
-      searchRegion: new Region(
-        bounds.origin.x,
-        bounds.origin.y,
-        bounds.size.width,
-        bounds.size.height,
-      ),
-    });
-
-    return {
-      x: region.left,
-      y: region.top,
-    };
   },
 
   async getCursor(): Promise<Point> {
@@ -90,6 +62,3 @@ export const nutAutomation: Automation = {
     });
   },
 };
-
-export const loadImage = async (imagePath: string): Promise<Image> =>
-  new Image(await loadNutImage(imagePath));
