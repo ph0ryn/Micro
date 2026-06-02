@@ -41,12 +41,13 @@ await chrome.move(point(500, 600), 800);
 await chrome.mouseUp();
 
 const cursor = await chrome.cursor();
+const size = await chrome.size();
 ```
 
 All durations are in milliseconds. `fclick()` uses the final argument as a
 pixel radius and clamps the generated point to the window. `cursor()` returns
 window-relative coordinates even when the cursor is currently outside the
-window.
+window. `size()` returns the current window width and height.
 
 ### Image Search
 

@@ -1,6 +1,6 @@
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
-import type { Match, Point } from "./types.ts";
+import type { Match, Point, Size } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
 
 export interface Automation {
@@ -133,6 +133,12 @@ export class Window {
       x: cursor.x - bounds.origin.x,
       y: cursor.y - bounds.origin.y,
     };
+  }
+
+  async size(): Promise<Size> {
+    const bounds = await this.boundsProvider.get(this.appName);
+
+    return bounds.size;
   }
 
   async find(image: Image, confidence = 0.99): Promise<Match> {

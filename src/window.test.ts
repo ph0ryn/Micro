@@ -184,6 +184,19 @@ describe("Window", () => {
     });
   });
 
+  test("returns the window size", async () => {
+    const { automation } = createAutomation();
+    const window = new Window("Chrome", {
+      automation,
+      boundsProvider,
+    });
+
+    expect(await window.size()).toEqual({
+      height: 600,
+      width: 800,
+    });
+  });
+
   test("rejects invalid coordinates", async () => {
     const { automation } = createAutomation();
     const window = new Window("Chrome", {
