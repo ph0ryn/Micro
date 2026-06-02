@@ -13,6 +13,8 @@ window moves.
 - pnpm
 - Bun
 - Accessibility permission for the terminal or application running the script
+- Screen Recording permission for the terminal or application running the
+  script when using image search
 
 The selected window must be visible on the main display.
 
@@ -45,6 +47,32 @@ All durations are in milliseconds. `fclick()` uses the final argument as a
 pixel radius and clamps the generated point to the window. `cursor()` returns
 window-relative coordinates even when the cursor is currently outside the
 window.
+
+### Image Search
+
+```ts
+import { getWindow, loadImage } from "micro";
+
+const chrome = await getWindow("Chrome");
+const button = await loadImage("assets/button.png");
+
+const match = await chrome.find(button);
+await chrome.click(match.center, 300);
+
+const matches = await chrome.findAll(button, 0.95);
+```
+
+`loadImage()` loads a reusable opaque `Image` from a PNG template. Transparent
+template pixels are excluded from matching. `find()` returns the first
+top-left threshold match and throws if no match is found. `findAll()` returns
+non-overlapping threshold matches in top-left order, or an empty array if none
+are found. Both methods use a default confidence threshold of `0.99`.
+
+Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
+and sizes are window-relative logical pixels and may be fractional.
+
+Image search currently does not support multi-scale matching, rotation, or
+windows on subdisplays.
 
 ## Scripts
 

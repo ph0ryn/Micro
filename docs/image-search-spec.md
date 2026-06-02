@@ -1,37 +1,15 @@
-# 画像検索機能の予定仕様
+# Image Search Specification
 
-## 状態
+## Scope
 
-この文書は未実装機能の予定仕様を記録する。
+Image search locates PNG templates inside a selected application window.
+Templates are loaded once and reused across searches.
 
-`Image`、`loadImage()`、`Window.find()` は現在の公開 API に含まれない。
-Apple Silicon と Node.js 24 で利用できる画像 matcher を選定した後に
-実装する。
+Image search requires Screen Recording permission for the terminal or
+application running the script. The selected window must be visible on the
+main display.
 
-## 目的
-
-ウィンドウ内の画像を検知し、一致した画像の左上座標をウィンドウ相対座標で
-取得できるようにする。
-
-画像ファイルは検索のたびに読み込まず、事前に一度だけ読み込んで再利用する。
-
-## 予定 API
-
-```ts
-import { getWindow, loadImage, point } from "micro";
-
-const chrome = await getWindow("Chrome");
-const button = await loadImage("assets/button.png");
-const topLeft = await chrome.find(button, 0.9);
-
-await chrome.click(
-  point(
-    topLeft.x + button.center.x,
-    topLeft.y + button.center.y,
-  ),
-  300,
-);
-```
+## API
 
 ```ts
 type Point = {
@@ -44,49 +22,59 @@ type Size = {
   height: number;
 };
 
-class Image {
+type Match = {
+  confidence: number;
+  origin: Point;
   size: Size;
   center: Point;
+};
+
+class Image {
+  private constructor();
 }
 
 loadImage(imagePath: string): Promise<Image>;
 
 class Window {
-  find(image: Image, confidence?: number): Promise<Point>;
+  find(image: Image, confidence?: number): Promise<Match>;
+  findAll(image: Image, confidence?: number): Promise<Match[]>;
 }
 ```
 
-## 挙動
+`Image` is opaque. Callers load it with `loadImage()` and pass it to search
+methods without inspecting its internal representation.
 
-- `loadImage()` は指定された画像ファイルを読み込み、再利用可能な `Image` を返す。
-- `Image.size` は画像の幅と高さを返す。
-- `Image.center` は画像内の中央座標を返す。端数は切り捨てる。
-- `Window.find()` は対象ウィンドウ内だけを検索する。
-- `Window.find()` は最初に一致した画像の左上座標を返す。
-- 返却座標は対象ウィンドウ左上を原点とする相対座標とする。
-- `confidence` は `0` から `1` の範囲で指定できる。
-- `confidence` の既定値は `0.99` とする。
-- 一致する画像がない場合は例外を返す。
+## Template Loading
 
-## 初版では扱わない機能
+- `loadImage()` accepts PNG templates only.
+- Loaded images are reusable across searches.
+- Transparent template pixels are excluded from matching.
 
-- 複数一致結果の取得
-- 画像を指定した直接クリック API
-- matcher の自動インストール
-- サブディスプレイ上のウィンドウ検索
+## Matching Behavior
 
-## 既知の課題
+- `Window.find()` and `Window.findAll()` search inside the selected window.
+- `confidence` is an optional threshold from `0` to `1`.
+- The default confidence threshold is `0.99`.
+- `Window.find()` returns the first threshold match in top-left order.
+- `Window.find()` throws if no match meets the threshold.
+- `Window.findAll()` returns non-overlapping threshold matches in top-left
+  order.
+- `Window.findAll()` returns an empty array if no match meets the threshold.
 
-`@nut-tree-fork/nut-js` 単体では画像 matcher provider が登録されないため、
-`Window.find()` を実行すると `No ImageFinder registered` で失敗する。
+## Match Coordinates
 
-fork 対応 matcher として `@udarrr/template-matcher` を確認したが、現在の
-Apple Silicon と Node.js 24 の環境では OpenCV native library を読み込めない。
+Each `Match` exposes:
 
-## 実装再開条件
+- `confidence`: the template match confidence.
+- `origin`: the top-left point of the matched region.
+- `size`: the width and height of the matched region.
+- `center`: the center point of the matched region.
 
-- Apple Silicon と Node.js 24 で動作する画像 matcher を選定する。
-- matcher の導入後に、メインディスプレイ上のウィンドウ内で画像検知の
-  実機確認を行う。
-- `loadImage()` が同じ画像データを再利用することをテストする。
-- `Window.find()` が絶対座標をウィンドウ相対座標へ変換することをテストする。
+`origin`, `size`, and `center` use window-relative logical pixels. Their values
+may be fractional.
+
+## Initial Exclusions
+
+- Multi-scale matching
+- Rotated template matching
+- Searching windows on subdisplays
