@@ -1,84 +1,72 @@
-# ts-base
+# Micro
 
-Reusable TypeScript base template for small ESM projects.
+Small macOS automation helpers for TypeScript.
 
-This repository is intentionally minimal. It provides strict TypeScript defaults,
-pnpm-only dependency management, Oxlint, ESLint, oxfmt, and Git hook integration
-without prescribing an application framework.
-
-## What Is Included
-
-- ESM package setup with `"type": "module"`.
-- `src/index.ts` as the default source entry point.
-- Strict `tsconfig.json` with `noEmit` enabled.
-- Oxlint type-aware linting and type checking.
-- ESLint rules for TypeScript naming conventions.
-- oxfmt formatting configuration.
-- Git hook integration through `lint-staged`.
-- pnpm workspace catalog for tool versions.
+Micro wraps [`@nut-tree-fork/nut-js`](https://www.npmjs.com/package/@nut-tree-fork/nut-js)
+with window-relative mouse operations. Coordinates are relative to the top-left
+corner of the selected application window, so scripts keep working when the
+window moves.
 
 ## Requirements
 
-- pnpm `10.33.0` or compatible.
-- Node.js capable of running pnpm tooling.
-- Bun-compatible ESM runtime if you use the default `"module"` entry directly.
+- macOS
+- pnpm
+- Bun
+- Accessibility permission for the terminal or application running the script
+- Screen Recording permission when using image search
 
-This template enforces pnpm during install. Do not use npm or yarn.
+The selected window must be visible on the main display.
 
-## Getting Started
-
-Use this repository as a template, then adjust the package metadata and scripts
-for the project you are creating.
+## Install
 
 ```sh
 pnpm install
 ```
 
-After cloning or creating a new repository from this template:
+## Usage
 
-1. Rename the package in `package.json`.
-2. Decide whether the generated project should stay private.
-3. Replace `src/index.ts` with the new project entry point.
-4. Add project-specific `dev`, `build`, `test`, or release scripts as needed.
+```ts
+import { getWindow, loadImage, point } from "micro";
+
+const chrome = await getWindow("Chrome");
+const button = await loadImage("assets/button.png");
+
+await chrome.move(point(100, 200), 300);
+await chrome.click(point(100, 200), 300);
+await chrome.fclick(point(100, 200), 300, 10);
+
+await chrome.mouseDown(point(100, 200), 300);
+await chrome.move(point(500, 600), 800);
+await chrome.mouseUp();
+
+const cursor = await chrome.cursor();
+const topLeft = await chrome.find(button, 0.9);
+
+await chrome.click(point(topLeft.x + button.center.x, topLeft.y + button.center.y), 300);
+```
+
+All durations are in milliseconds. `fclick()` uses the final argument as a
+pixel radius and clamps the generated point to the window. `find()` searches
+only within the selected window and returns the relative top-left coordinate of
+the first match.
+
+Images are loaded explicitly so repeated calls to `find()` reuse the same image
+data:
+
+```ts
+const button = await loadImage("assets/button.png");
+
+await chrome.find(button);
+await chrome.find(button);
+```
+
+The default image match confidence is `0.99`.
 
 ## Scripts
-
-Run all commands from the repository root.
 
 | Command           | Description                                      |
 | ----------------- | ------------------------------------------------ |
 | `pnpm install`    | Install dependencies and configure Git hooks.    |
 | `pnpm run lint`   | Run Oxlint type-aware linting and type checking. |
 | `pnpm run format` | Run lint fixes, oxfmt, and ESLint fixes.         |
-
-## Project Layout
-
-```text
-.
-├── src/index.ts          # Default source entry
-├── eslint.config.mjs     # ESLint configuration
-├── oxlint.config.ts      # Oxlint configuration
-├── .oxfmtrc.jsonc        # oxfmt configuration
-├── .githooks/            # Git hooks
-├── package.json          # Scripts and package metadata
-├── pnpm-workspace.yaml   # pnpm workspace and catalog settings
-└── tsconfig.json         # TypeScript compiler options
-```
-
-## Template Notes
-
-- Keep shared defaults generic. Project-specific behavior should be added after
-  creating a repository from the template.
-- Prefer adding scripts over changing the meaning of the existing ones.
-- Keep tool versions in `pnpm-workspace.yaml` catalog entries unless a consuming
-  project has a reason to manage versions differently.
-- `package.json` is marked private by default so new repositories do not publish
-  accidentally.
-
-## License
-
-You may use this repository as a template to create new projects.
-
-Projects created from this template may choose their own license. They are not
-required to use the MIT License or any other license solely because this
-template was used.
+| `pnpm run test`   | Run Bun unit tests.                              |

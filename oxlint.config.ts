@@ -20,7 +20,7 @@ export default defineConfig({
   jsPlugins: [
     {
       name: "@stylistic",
-      specifier: (import.meta as ImportMeta).resolve("@stylistic/eslint-plugin"),
+      specifier: (import.meta as unknown as ImportMeta).resolve("@stylistic/eslint-plugin"),
     },
   ],
   plugins: ["typescript"],
