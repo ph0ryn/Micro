@@ -6,8 +6,8 @@ Image search locates PNG templates inside a selected application window.
 Templates are loaded once and reused across searches.
 
 Image search requires Screen Recording permission for the terminal or
-application running the script. The selected window must be visible on the
-main display.
+application running the script. The selected window must be visible on a
+display.
 
 ## API
 
@@ -77,4 +77,4 @@ may be fractional.
 
 - Multi-scale matching
 - Rotated template matching
-- Searching windows on subdisplays
+- Windows spanning displays with different scales

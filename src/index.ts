@@ -1,7 +1,7 @@
 import { createImageFinder } from "./image-finder.ts";
 import { mouseAutomation } from "./mouse.ts";
 import { opencvMatcher } from "./opencv.ts";
-import { nutScreenCapture } from "./screen.ts";
+import { macScreenCapture } from "./screen.ts";
 import { macWindowBoundsProvider } from "./window-bounds.ts";
 import { Window } from "./window.ts";
 
@@ -16,6 +16,6 @@ export const getWindow = async (appName: string): Promise<Window> => {
   return new Window(appName, {
     automation: mouseAutomation,
     boundsProvider: macWindowBoundsProvider,
-    imageFinder: createImageFinder(nutScreenCapture, opencvMatcher),
+    imageFinder: createImageFinder(macScreenCapture, opencvMatcher),
   });
 };

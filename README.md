@@ -16,7 +16,7 @@ window moves.
 - Screen Recording permission for the terminal or application running the
   script when using image search
 
-The selected window must be visible on the main display.
+The selected window must be visible on a display.
 
 ## Install
 
@@ -71,8 +71,9 @@ are found. Both methods use a default confidence threshold of `0.99`.
 Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
 and sizes are window-relative logical pixels and may be fractional.
 
-Image search currently does not support multi-scale matching, rotation, or
-windows on subdisplays.
+Image search currently does not support multi-scale matching or rotation.
+Templates should be captured at the scale of the display where they are used.
+Windows spanning displays with different scales are not supported.
 
 ## Scripts
 
