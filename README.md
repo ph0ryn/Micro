@@ -31,6 +31,7 @@ import { getWindow, loadImage, point } from "micro";
 const chrome = await getWindow("Chrome");
 const button = await loadImage("assets/button.png");
 
+await chrome.focus();
 await chrome.move(point(100, 200), 300);
 await chrome.click(point(100, 200), 300);
 await chrome.fclick(point(100, 200), 300, 10);

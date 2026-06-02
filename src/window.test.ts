@@ -18,6 +18,7 @@ const bounds: WindowBounds = {
 };
 
 const boundsProvider: WindowBoundsProvider = {
+  async focus(): Promise<void> {},
   async get(): Promise<WindowBounds> {
     return bounds;
   },
@@ -65,6 +66,26 @@ const createAutomation = () => {
 };
 
 describe("Window", () => {
+  test("focuses the target application window", async () => {
+    const { automation } = createAutomation();
+    const calls: string[] = [];
+    const window = new Window("Chrome", {
+      automation,
+      boundsProvider: {
+        async focus(appName): Promise<void> {
+          calls.push(appName);
+        },
+        async get(): Promise<WindowBounds> {
+          return bounds;
+        },
+      },
+    });
+
+    await window.focus();
+
+    expect(calls).toEqual(["Chrome"]);
+  });
+
   test("uses window-relative coordinates for movement and clicking", async () => {
     const { automation, calls } = createAutomation();
     const window = new Window("Chrome", {

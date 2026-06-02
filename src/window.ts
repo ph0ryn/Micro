@@ -66,6 +66,10 @@ export class Window {
     await runWindowOperation(() => this.moveInternal(target, durationMs));
   }
 
+  async focus(): Promise<void> {
+    await runWindowOperation(() => this.boundsProvider.focus(this.appName));
+  }
+
   async click(target: Point, durationMs: number): Promise<void> {
     await runWindowOperation(async () => {
       await this.moveInternal(target, durationMs);
