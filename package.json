@@ -27,7 +27,8 @@
     ]
   },
   "dependencies": {
-    "@nut-tree-fork/nut-js": "catalog:"
+    "@nut-tree-fork/nut-js": "catalog:",
+    "opencv-js-wasm": "catalog:"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",

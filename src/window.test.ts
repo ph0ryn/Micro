@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import { type Automation, Window } from "./window.ts";
 
-import type { Point } from "./types.ts";
+import type { ImageFinder } from "./image-finder.ts";
+import type { Image } from "./image.ts";
+import type { Match, Point } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
 
 const bounds: WindowBounds = {
@@ -51,6 +53,44 @@ const createAutomation = () => {
   return {
     automation,
     calls,
+  };
+};
+
+const image = {} as Image;
+const match: Match = {
+  center: {
+    x: 30,
+    y: 50,
+  },
+  confidence: 0.995,
+  origin: {
+    x: 20,
+    y: 40,
+  },
+  size: {
+    height: 20,
+    width: 20,
+  },
+};
+
+const createImageFinder = () => {
+  const calls: unknown[][] = [];
+  const imageFinder: ImageFinder = {
+    async find(needle, searchBounds, confidence) {
+      calls.push(["find", needle, searchBounds, confidence]);
+
+      return match;
+    },
+    async findAll(needle, searchBounds, confidence) {
+      calls.push(["findAll", needle, searchBounds, confidence]);
+
+      return [match];
+    },
+  };
+
+  return {
+    calls,
+    imageFinder,
   };
 };
 
@@ -152,5 +192,44 @@ describe("Window", () => {
     });
 
     expect(window.move({ x: 800, y: 0 }, 0)).rejects.toThrow("outside the window");
+  });
+
+  test("finds images with a default confidence", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    const window = new Window("Chrome", {
+      automation,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(await window.find(image)).toEqual(match);
+    expect(calls).toEqual([["find", image, bounds, 0.99]]);
+  });
+
+  test("finds all images with an explicit confidence", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    const window = new Window("Chrome", {
+      automation,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(await window.findAll(image, 0.9)).toEqual([match]);
+    expect(calls).toEqual([["findAll", image, bounds, 0.9]]);
+  });
+
+  test("rejects invalid confidence", () => {
+    const { automation } = createAutomation();
+    const { imageFinder } = createImageFinder();
+    const window = new Window("Chrome", {
+      automation,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(window.find(image, 2)).rejects.toThrow("confidence must be between 0 and 1");
+    expect(window.findAll(image, Number.NaN)).rejects.toThrow("confidence must be between 0 and 1");
   });
 });

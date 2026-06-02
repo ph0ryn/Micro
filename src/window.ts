@@ -1,4 +1,6 @@
-import type { Point } from "./types.ts";
+import type { ImageFinder } from "./image-finder.ts";
+import type { Image } from "./image.ts";
+import type { Match, Point } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
 
 export interface Automation {
@@ -12,12 +14,19 @@ export interface Automation {
 export interface WindowDependencies {
   automation: Automation;
   boundsProvider: WindowBoundsProvider;
+  imageFinder?: ImageFinder;
   random?: () => number;
 }
 
 const assertDuration = (durationMs: number): void => {
   if (!Number.isFinite(durationMs) || durationMs < 0) {
     throw new Error("durationMs must be a non-negative finite number");
+  }
+};
+
+const assertConfidence = (confidence: number): void => {
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new Error("confidence must be between 0 and 1");
   }
 };
 
@@ -51,12 +60,14 @@ export class Window {
   private readonly appName: string;
   private readonly automation: Automation;
   private readonly boundsProvider: WindowBoundsProvider;
+  private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
 
   constructor(appName: string, dependencies: WindowDependencies) {
     this.appName = appName;
     this.automation = dependencies.automation;
     this.boundsProvider = dependencies.boundsProvider;
+    this.imageFinder = dependencies.imageFinder;
     this.random = dependencies.random ?? Math.random;
   }
 
@@ -122,6 +133,32 @@ export class Window {
       x: cursor.x - bounds.origin.x,
       y: cursor.y - bounds.origin.y,
     };
+  }
+
+  async find(image: Image, confidence = 0.99): Promise<Match> {
+    assertConfidence(confidence);
+
+    const imageFinder = this.getImageFinder();
+    const bounds = await this.boundsProvider.get(this.appName);
+
+    return imageFinder.find(image, bounds, confidence);
+  }
+
+  async findAll(image: Image, confidence = 0.99): Promise<Match[]> {
+    assertConfidence(confidence);
+
+    const imageFinder = this.getImageFinder();
+    const bounds = await this.boundsProvider.get(this.appName);
+
+    return imageFinder.findAll(image, bounds, confidence);
+  }
+
+  private getImageFinder(): ImageFinder {
+    if (!this.imageFinder) {
+      throw new Error("Image search is not configured");
+    }
+
+    return this.imageFinder;
   }
 
   private async toAbsolute(target: Point): Promise<Point> {

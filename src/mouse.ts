@@ -18,7 +18,7 @@ const runMouseOperation = async <Result>(operation: () => Promise<Result>): Prom
   return current;
 };
 
-export const nutAutomation: Automation = {
+export const mouseAutomation: Automation = {
   async click(): Promise<void> {
     await runMouseOperation(() => mouse.leftClick());
   },

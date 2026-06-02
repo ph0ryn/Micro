@@ -8,4 +8,11 @@ export interface Size {
   height: number;
 }
 
+export interface Match {
+  center: Point;
+  confidence: number;
+  origin: Point;
+  size: Size;
+}
+
 export const point = (x: number, y: number): Point => ({ x, y });
