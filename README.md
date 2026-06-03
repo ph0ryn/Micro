@@ -27,7 +27,9 @@ pnpm install
 ## Usage
 
 ```ts
-import { getWindow, point } from "micro";
+import { checkRequirements, getWindow, point } from "micro";
+
+await checkRequirements();
 
 const chrome = await getWindow("Chrome");
 
@@ -75,6 +77,12 @@ and sizes are window-relative logical pixels and may be fractional.
 Image search currently does not support multi-scale matching or rotation.
 Templates should be captured at the scale of the display where they are used.
 Windows spanning displays with different scales are not supported.
+
+Use `checkRequirements({ screenRecording: true })` before image search when you
+want to check Screen Recording permission as well as the default macOS and
+Accessibility requirements.
+If a required permission is missing, Micro opens the matching macOS Settings
+pane and throws an error.
 
 ## Scripts
 

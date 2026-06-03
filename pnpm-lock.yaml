@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@nut-tree-fork/node-mac-permissions':
+      specifier: ^2.2.1
+      version: 2.2.1
     '@nut-tree-fork/nut-js':
       specifier: ^4.2.6
       version: 4.2.6
@@ -53,6 +56,9 @@ importers:
 
   .:
     dependencies:
+      '@nut-tree-fork/node-mac-permissions':
+        specifier: 'catalog:'
+        version: 2.2.1
       '@nut-tree-fork/nut-js':
         specifier: 'catalog:'
         version: 4.2.6
@@ -1805,7 +1811,6 @@ snapshots:
     dependencies:
       bindings: 1.5.0
       node-addon-api: 5.0.0
-    optional: true
 
   '@nut-tree-fork/nut-js@4.2.6':
     dependencies:
@@ -2520,8 +2525,7 @@ snapshots:
 
   node-abort-controller@3.1.1: {}
 
-  node-addon-api@5.0.0:
-    optional: true
+  node-addon-api@5.0.0: {}
 
   node-fetch@2.7.0:
     dependencies:

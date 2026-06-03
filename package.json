@@ -27,6 +27,7 @@
     ]
   },
   "dependencies": {
+    "@nut-tree-fork/node-mac-permissions": "catalog:",
     "@nut-tree-fork/nut-js": "catalog:",
     "opencv-js-wasm": "catalog:"
   },
