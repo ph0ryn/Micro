@@ -1,7 +1,7 @@
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
 import type { Match, Point, Size } from "./types.ts";
-import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
+import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
 
 export interface Automation {
   click(): Promise<void>;
@@ -57,14 +57,14 @@ const runWindowOperation = async <Result>(operation: () => Promise<Result>): Pro
 };
 
 export class Window {
-  private readonly appName: string;
+  private readonly target: WindowTarget;
   private readonly automation: Automation;
   private readonly boundsProvider: WindowBoundsProvider;
   private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
 
-  constructor(appName: string, dependencies: WindowDependencies) {
-    this.appName = appName;
+  constructor(target: WindowTarget, dependencies: WindowDependencies) {
+    this.target = target;
     this.automation = dependencies.automation;
     this.boundsProvider = dependencies.boundsProvider;
     this.imageFinder = dependencies.imageFinder;
@@ -76,7 +76,7 @@ export class Window {
   }
 
   async focus(): Promise<void> {
-    await runWindowOperation(() => this.boundsProvider.focus(this.appName));
+    await runWindowOperation(() => this.boundsProvider.focus(this.target));
   }
 
   async click(target: Point, durationMs: number): Promise<void> {
@@ -92,7 +92,7 @@ export class Window {
         throw new Error("fuzzy must be a non-negative finite number");
       }
 
-      const bounds = await this.boundsProvider.get(this.appName);
+      const bounds = await this.boundsProvider.get(this.target);
 
       assertPointInWindow(target, bounds);
 
@@ -125,7 +125,7 @@ export class Window {
 
   async cursor(): Promise<Point> {
     const [bounds, cursor] = await Promise.all([
-      this.boundsProvider.get(this.appName),
+      this.boundsProvider.get(this.target),
       this.automation.getCursor(),
     ]);
 
@@ -136,7 +136,7 @@ export class Window {
   }
 
   async size(): Promise<Size> {
-    const bounds = await this.boundsProvider.get(this.appName);
+    const bounds = await this.boundsProvider.get(this.target);
 
     return bounds.size;
   }
@@ -145,7 +145,7 @@ export class Window {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
-    const bounds = await this.boundsProvider.get(this.appName);
+    const bounds = await this.boundsProvider.get(this.target);
 
     return imageFinder.find(image, bounds, confidence);
   }
@@ -154,7 +154,7 @@ export class Window {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
-    const bounds = await this.boundsProvider.get(this.appName);
+    const bounds = await this.boundsProvider.get(this.target);
 
     return imageFinder.findAll(image, bounds, confidence);
   }
@@ -168,7 +168,7 @@ export class Window {
   }
 
   private async toAbsolute(target: Point): Promise<Point> {
-    const bounds = await this.boundsProvider.get(this.appName);
+    const bounds = await this.boundsProvider.get(this.target);
 
     assertPointInWindow(target, bounds);
 

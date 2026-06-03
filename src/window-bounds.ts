@@ -5,23 +5,51 @@ import type { Point, Size } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 
-const findTargetScript = String.raw`
-function findTarget(appName) {
-  const query = appName.toLowerCase();
-  const systemEvents = Application("System Events");
+export const findTargetScript = String.raw`
+function describeTarget(target) {
+  if (typeof target.bundleId === "string") {
+    return "bundleId: " + target.bundleId;
+  }
+
+  return "name: " + target.name;
+}
+
+function matchesTarget(process, target) {
+  if (typeof target.bundleId === "string") {
+    return process.bundleIdentifier() === target.bundleId;
+  }
+
+  return process.name() === target.name;
+}
+
+function getSystemEvents() {
+  if (typeof __microApplication === "function") {
+    return __microApplication("System Events");
+  }
+
+  return Application("System Events");
+}
+
+function findTarget(target) {
+  const systemEvents = getSystemEvents();
   const candidates = systemEvents.applicationProcesses.whose({ visible: true })()
-    .filter((process) => process.name().toLowerCase().includes(query));
-  const target = candidates.find((process) => process.frontmost()) ?? candidates[0];
+    .filter((process) => matchesTarget(process, target));
 
-  if (!target) {
-    throw new Error("Application not found: " + appName);
+  if (candidates.length === 0) {
+    throw new Error("Application not found for " + describeTarget(target));
   }
 
-  if (target.windows().length === 0) {
-    throw new Error("Window not found for application: " + target.name());
+  if (candidates.length > 1) {
+    throw new Error("Ambiguous application target for " + describeTarget(target));
   }
 
-  return target;
+  const candidate = candidates[0];
+
+  if (candidate.windows().length === 0) {
+    throw new Error("Window not found for application: " + candidate.name());
+  }
+
+  return candidate;
 }
 `;
 
@@ -29,7 +57,7 @@ const windowBoundsScript = String.raw`
 ${findTargetScript}
 
 function run(argv) {
-  const target = findTarget(argv[0]);
+  const target = findTarget(JSON.parse(argv[0]));
   const position = target.windows()[0].position();
   const size = target.windows()[0].size();
 
@@ -44,11 +72,13 @@ const focusWindowScript = String.raw`
 ${findTargetScript}
 
 function run(argv) {
-  const target = findTarget(argv[0]);
+  const target = findTarget(JSON.parse(argv[0]));
 
   target.frontmost = true;
 }
 `;
+
+export type WindowTarget = { bundleId: string; name?: never } | { bundleId?: never; name: string };
 
 export interface WindowBounds {
   origin: Point;
@@ -56,20 +86,29 @@ export interface WindowBounds {
 }
 
 export interface WindowBoundsProvider {
-  focus(appName: string): Promise<void>;
-  get(appName: string): Promise<WindowBounds>;
+  focus(target: WindowTarget): Promise<void>;
+  get(target: WindowTarget): Promise<WindowBounds>;
 }
 
+const serializeWindowTarget = (target: WindowTarget): string => JSON.stringify(target);
+
 export const macWindowBoundsProvider: WindowBoundsProvider = {
-  async focus(appName: string): Promise<void> {
+  async focus(target: WindowTarget): Promise<void> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
-    await execFileAsync("osascript", ["-l", "JavaScript", "-e", focusWindowScript, "--", appName]);
+    await execFileAsync("osascript", [
+      "-l",
+      "JavaScript",
+      "-e",
+      focusWindowScript,
+      "--",
+      serializeWindowTarget(target),
+    ]);
   },
 
-  async get(appName: string): Promise<WindowBounds> {
+  async get(target: WindowTarget): Promise<WindowBounds> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
@@ -80,7 +119,7 @@ export const macWindowBoundsProvider: WindowBoundsProvider = {
       "-e",
       windowBoundsScript,
       "--",
-      appName,
+      serializeWindowTarget(target),
     ]);
 
     return JSON.parse(stdout) as WindowBounds;

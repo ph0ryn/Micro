@@ -31,7 +31,7 @@ import { checkRequirements, getWindow, point } from "micro";
 
 await checkRequirements();
 
-const chrome = await getWindow("Chrome");
+const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 
 await chrome.focus();
 await chrome.move(point(100, 200), 300);
@@ -56,7 +56,7 @@ window. `size()` returns the current window width and height.
 ```ts
 import { getWindow, loadImage } from "micro";
 
-const chrome = await getWindow("Chrome");
+const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 const button = await loadImage("assets/button.png");
 
 const match = await chrome.find(button);

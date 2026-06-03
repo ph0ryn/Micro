@@ -5,7 +5,11 @@ import { type Automation, Window } from "./window.ts";
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
 import type { Match, Point } from "./types.ts";
-import type { WindowBounds, WindowBoundsProvider } from "./window-bounds.ts";
+import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
+
+const target: WindowTarget = {
+  bundleId: "com.google.Chrome",
+};
 
 const bounds: WindowBounds = {
   origin: {
@@ -97,12 +101,12 @@ const createImageFinder = () => {
 describe("Window", () => {
   test("focuses the target application window", async () => {
     const { automation } = createAutomation();
-    const calls: string[] = [];
-    const window = new Window("Chrome", {
+    const calls: WindowTarget[] = [];
+    const window = new Window(target, {
       automation,
       boundsProvider: {
-        async focus(appName): Promise<void> {
-          calls.push(appName);
+        async focus(windowTarget): Promise<void> {
+          calls.push(windowTarget);
         },
         async get(): Promise<WindowBounds> {
           return bounds;
@@ -112,12 +116,12 @@ describe("Window", () => {
 
     await window.focus();
 
-    expect(calls).toEqual(["Chrome"]);
+    expect(calls).toEqual([target]);
   });
 
   test("uses window-relative coordinates for movement and clicking", async () => {
     const { automation, calls } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -130,7 +134,7 @@ describe("Window", () => {
   test("clamps fuzzy clicks to the window", async () => {
     const { automation, calls } = createAutomation();
     const randomValues = [0, 1];
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
       random: () => randomValues.shift() ?? 0,
@@ -143,7 +147,7 @@ describe("Window", () => {
 
   test("keeps mouse down and mouse up as separate operations", async () => {
     const { automation, calls } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -156,7 +160,7 @@ describe("Window", () => {
 
   test("keeps concurrent click sequences together", async () => {
     const { automation, calls } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -173,7 +177,7 @@ describe("Window", () => {
 
   test("returns the cursor position relative to the window", async () => {
     const { automation } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -186,7 +190,7 @@ describe("Window", () => {
 
   test("returns the window size", async () => {
     const { automation } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -199,7 +203,7 @@ describe("Window", () => {
 
   test("rejects invalid coordinates", async () => {
     const { automation } = createAutomation();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
     });
@@ -210,7 +214,7 @@ describe("Window", () => {
   test("finds images with a default confidence", async () => {
     const { automation } = createAutomation();
     const { calls, imageFinder } = createImageFinder();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
       imageFinder,
@@ -223,7 +227,7 @@ describe("Window", () => {
   test("finds all images with an explicit confidence", async () => {
     const { automation } = createAutomation();
     const { calls, imageFinder } = createImageFinder();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
       imageFinder,
@@ -236,7 +240,7 @@ describe("Window", () => {
   test("rejects invalid confidence", () => {
     const { automation } = createAutomation();
     const { imageFinder } = createImageFinder();
-    const window = new Window("Chrome", {
+    const window = new Window(target, {
       automation,
       boundsProvider,
       imageFinder,
