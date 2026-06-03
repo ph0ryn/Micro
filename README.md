@@ -51,6 +51,20 @@ pixel radius and clamps the generated point to the window. `cursor()` returns
 window-relative coordinates even when the cursor is currently outside the
 window. `size()` returns the current window width and height.
 
+To list bundle IDs for visible applications:
+
+```sh
+osascript -l JavaScript -e '
+const se = Application("System Events");
+
+se.applicationProcesses
+  .whose({ visible: true })()
+  .map((process) => `${process.name()}\t${process.bundleIdentifier()}`)
+  .sort()
+  .join("\n");
+'
+```
+
 ### Image Search
 
 ```ts
