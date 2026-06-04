@@ -21,6 +21,9 @@ catalogs:
     '@typescript/native-preview':
       specifier: 7.0.0-dev.20260430.1
       version: 7.0.0-dev.20260430.1
+    clean-pkg-json:
+      specifier: ^1.4.2
+      version: 1.4.2
     eslint:
       specifier: ^10.3.0
       version: 10.3.0
@@ -75,6 +78,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260430.1
+      clean-pkg-json:
+        specifier: 'catalog:'
+        version: 1.4.2
       eslint:
         specifier: 'catalog:'
         version: 10.3.0
@@ -832,6 +838,10 @@ packages:
 
   centra@2.7.0:
     resolution: {integrity: sha512-PbFMgMSrmgx6uxCdm57RUos9Tc3fclMvhLSATYN39XsDV29B89zZ3KA89jmY0vwSGazyU+uerqwa6t+KaodPcg==}
+
+  clean-pkg-json@1.4.2:
+    resolution: {integrity: sha512-o201s9wWOYoZSRui4QyARSFc3n0IcYDu62hkJCQGX1eshSSQ/90QhS/KveWp/QlXSqcF/g/q2+IINj25V1BMKw==}
+    hasBin: true
 
   cli-cursor@5.0.0:
     resolution: {integrity: sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw==}
@@ -2181,6 +2191,8 @@ snapshots:
       follow-redirects: 1.16.0
     transitivePeerDependencies:
       - debug
+
+  clean-pkg-json@1.4.2: {}
 
   cli-cursor@5.0.0:
     dependencies:

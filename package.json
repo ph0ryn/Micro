@@ -1,14 +1,26 @@
 {
-  "name": "micro",
-  "private": true,
+  "name": "@ph0ryn/micro",
+  "version": "0.1.0",
+  "description": "Window-relative macOS automation helpers for TypeScript, built on nut.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ph0ryn/micro.git"
+  },
+  "license": "MIT",
+  "author": "ph0ryn",
   "type": "module",
   "exports": "./src/index.ts",
   "module": "src/index.ts",
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "format": "pnpm run lint --fix . ; oxfmt . ; eslint --fix .",
-    "preinstall": "npx only-allow pnpm",
-    "postinstall": "git config core.hooksPath .githooks",
     "lint": "oxlint --type-aware --type-check",
+    "prepack": "clean-pkg-json -r devDependencies",
     "precommit": "pnpm run format",
     "test": "bun test"
   },
@@ -35,6 +47,7 @@
     "@stylistic/eslint-plugin": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "clean-pkg-json": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-oxlint": "catalog:",
     "lint-staged": "catalog:",
@@ -45,5 +58,14 @@
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"
   },
-  "packageManager": "pnpm@11.1.1"
+  "packageManager": "pnpm@11.1.1",
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "os": [
+    "darwin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
