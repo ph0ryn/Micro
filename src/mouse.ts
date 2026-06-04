@@ -5,6 +5,8 @@ import type { Automation } from "./window.ts";
 
 const toNutPoint = (target: Point): NutPoint => new NutPoint(target.x, target.y);
 
+mouse.config.autoDelayMs = 0;
+
 let mouseOperation = Promise.resolve();
 
 const runMouseOperation = async <Result>(operation: () => Promise<Result>): Promise<Result> => {

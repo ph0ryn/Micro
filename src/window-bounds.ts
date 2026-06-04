@@ -68,13 +68,21 @@ function run(argv) {
 }
 `;
 
-const focusWindowScript = String.raw`
+const focusAndGetWindowBoundsScript = String.raw`
 ${findTargetScript}
 
 function run(argv) {
   const target = findTarget(JSON.parse(argv[0]));
 
   target.frontmost = true;
+
+  const position = target.windows()[0].position();
+  const size = target.windows()[0].size();
+
+  return JSON.stringify({
+    origin: { x: position[0], y: position[1] },
+    size: { width: size[0], height: size[1] },
+  });
 }
 `;
 
@@ -86,26 +94,28 @@ export interface WindowBounds {
 }
 
 export interface WindowBoundsProvider {
-  focus(target: WindowTarget): Promise<void>;
+  focusAndGet(target: WindowTarget): Promise<WindowBounds>;
   get(target: WindowTarget): Promise<WindowBounds>;
 }
 
 const serializeWindowTarget = (target: WindowTarget): string => JSON.stringify(target);
 
 export const macWindowBoundsProvider: WindowBoundsProvider = {
-  async focus(target: WindowTarget): Promise<void> {
+  async focusAndGet(target: WindowTarget): Promise<WindowBounds> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
-    await execFileAsync("osascript", [
+    const { stdout } = await execFileAsync("osascript", [
       "-l",
       "JavaScript",
       "-e",
-      focusWindowScript,
+      focusAndGetWindowBoundsScript,
       "--",
       serializeWindowTarget(target),
     ]);
+
+    return JSON.parse(stdout) as WindowBounds;
   },
 
   async get(target: WindowTarget): Promise<WindowBounds> {

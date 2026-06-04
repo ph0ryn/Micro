@@ -43,14 +43,15 @@ await chrome.move(point(500, 600), 800);
 await chrome.mouseUp();
 
 const cursor = await chrome.cursor();
-const size = await chrome.size();
+const size = chrome.size;
 ```
 
 Move durations are in milliseconds. `click()` and `mouseDown()` use the current
 cursor position when called without a target. `fclick()` uses the final argument
 as a pixel radius and clamps the generated point to the window. `cursor()`
 returns window-relative coordinates even when the cursor is currently outside
-the window. `size()` returns the current window width and height.
+the window. `size` returns the cached window width and height. Call
+`refreshBounds()` after moving or resizing the window outside Micro.
 
 To list bundle IDs for visible applications:
 

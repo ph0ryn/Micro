@@ -13,6 +13,7 @@ export interface Automation {
 
 export interface WindowDependencies {
   automation: Automation;
+  bounds: WindowBounds;
   boundsProvider: WindowBoundsProvider;
   imageFinder?: ImageFinder;
   random?: () => number;
@@ -62,10 +63,12 @@ export class Window {
   private readonly boundsProvider: WindowBoundsProvider;
   private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
+  private bounds: WindowBounds;
 
   constructor(target: WindowTarget, dependencies: WindowDependencies) {
     this.target = target;
     this.automation = dependencies.automation;
+    this.bounds = dependencies.bounds;
     this.boundsProvider = dependencies.boundsProvider;
     this.imageFinder = dependencies.imageFinder;
     this.random = dependencies.random ?? Math.random;
@@ -76,7 +79,13 @@ export class Window {
   }
 
   async focus(): Promise<void> {
-    await runWindowOperation(() => this.boundsProvider.focus(this.target));
+    await runWindowOperation(async () => {
+      this.bounds = await this.boundsProvider.focusAndGet(this.target);
+    });
+  }
+
+  async refreshBounds(): Promise<WindowBounds> {
+    return runWindowOperation(() => this.refreshBoundsInternal());
   }
 
   async click(target?: Point): Promise<void> {
@@ -97,6 +106,8 @@ export class Window {
 
       const bounds = await this.boundsProvider.get(this.target);
 
+      this.bounds = bounds;
+
       assertPointInWindow(target, bounds);
 
       const fuzzed = {
@@ -110,7 +121,7 @@ export class Window {
         ),
       };
 
-      await this.moveInternal(fuzzed, 0);
+      await this.moveInternal(fuzzed, 0, bounds);
       await this.automation.click();
     });
   }
@@ -130,10 +141,8 @@ export class Window {
   }
 
   async cursor(): Promise<Point> {
-    const [bounds, cursor] = await Promise.all([
-      this.boundsProvider.get(this.target),
-      this.automation.getCursor(),
-    ]);
+    const bounds = this.bounds;
+    const cursor = await this.automation.getCursor();
 
     return {
       x: cursor.x - bounds.origin.x,
@@ -141,28 +150,24 @@ export class Window {
     };
   }
 
-  async size(): Promise<Size> {
-    const bounds = await this.boundsProvider.get(this.target);
-
-    return bounds.size;
+  get size(): Size {
+    return this.bounds.size;
   }
 
   async find(image: Image, confidence = 0.99): Promise<Match | null> {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
-    const bounds = await this.boundsProvider.get(this.target);
 
-    return imageFinder.find(image, bounds, confidence);
+    return imageFinder.find(image, this.bounds, confidence);
   }
 
   async findAll(image: Image, confidence = 0.99): Promise<Match[]> {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
-    const bounds = await this.boundsProvider.get(this.target);
 
-    return imageFinder.findAll(image, bounds, confidence);
+    return imageFinder.findAll(image, this.bounds, confidence);
   }
 
   private getImageFinder(): ImageFinder {
@@ -173,21 +178,33 @@ export class Window {
     return this.imageFinder;
   }
 
-  private async toAbsolute(target: Point): Promise<Point> {
+  private async refreshBoundsInternal(): Promise<WindowBounds> {
     const bounds = await this.boundsProvider.get(this.target);
 
-    assertPointInWindow(target, bounds);
+    this.bounds = bounds;
+
+    return bounds;
+  }
+
+  private async toAbsolute(target: Point, bounds?: WindowBounds): Promise<Point> {
+    const resolvedBounds = bounds ?? this.bounds;
+
+    assertPointInWindow(target, resolvedBounds);
 
     return {
-      x: bounds.origin.x + target.x,
-      y: bounds.origin.y + target.y,
+      x: resolvedBounds.origin.x + target.x,
+      y: resolvedBounds.origin.y + target.y,
     };
   }
 
-  private async moveInternal(target: Point, durationMs: number): Promise<void> {
+  private async moveInternal(
+    target: Point,
+    durationMs: number,
+    bounds?: WindowBounds,
+  ): Promise<void> {
     assertDuration(durationMs);
 
-    const absolute = await this.toAbsolute(target);
+    const absolute = await this.toAbsolute(target, bounds);
 
     await this.automation.move(absolute, durationMs);
   }

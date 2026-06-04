@@ -23,7 +23,9 @@ const bounds: WindowBounds = {
 };
 
 const boundsProvider: WindowBoundsProvider = {
-  async focus(): Promise<void> {},
+  async focusAndGet(): Promise<WindowBounds> {
+    return bounds;
+  },
   async get(): Promise<WindowBounds> {
     return bounds;
   },
@@ -99,14 +101,124 @@ const createImageFinder = () => {
 };
 
 describe("Window", () => {
-  test("focuses the target application window", async () => {
-    const { automation } = createAutomation();
+  test("uses initial bounds without repeated provider calls", async () => {
+    const { automation, calls } = createAutomation();
+    let getCalls = 0;
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          getCalls += 1;
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+        async get(): Promise<WindowBounds> {
+          getCalls += 1;
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+    });
+
+    expect(window.size).toEqual({
+      height: 600,
+      width: 800,
+    });
+
+    await window.click({ x: 20, y: 30 });
+
+    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
+    expect(getCalls).toBe(0);
+  });
+
+  test("refreshes cached bounds explicitly", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+        async get(): Promise<WindowBounds> {
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+    });
+
+    expect(await window.refreshBounds()).toEqual({
+      origin: {
+        x: 300,
+        y: 400,
+      },
+      size: {
+        height: 700,
+        width: 900,
+      },
+    });
+
+    await window.click({ x: 20, y: 30 });
+
+    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
+  });
+
+  test("focuses the target application window and refreshes bounds", async () => {
+    const { automation, calls: automationCalls } = createAutomation();
     const calls: WindowTarget[] = [];
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider: {
-        async focus(windowTarget): Promise<void> {
+        async focusAndGet(windowTarget): Promise<WindowBounds> {
           calls.push(windowTarget);
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
         },
         async get(): Promise<WindowBounds> {
           return bounds;
@@ -115,14 +227,17 @@ describe("Window", () => {
     });
 
     await window.focus();
+    await window.click({ x: 20, y: 30 });
 
     expect(calls).toEqual([target]);
+    expect(automationCalls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
   });
 
   test("uses window-relative coordinates for movement and clicking", async () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -135,6 +250,7 @@ describe("Window", () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -148,6 +264,7 @@ describe("Window", () => {
     const randomValues = [0, 1];
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
       random: () => randomValues.shift() ?? 0,
     });
@@ -157,10 +274,47 @@ describe("Window", () => {
     expect(calls).toEqual([["move", { x: 100, y: 799 }, 0], ["click"]]);
   });
 
+  test("uses freshly fetched bounds consistently for fuzzy clicks", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+      random: () => 0.5,
+    });
+
+    await window.fclick({ x: 20, y: 30 }, 10);
+    await window.click({ x: 21, y: 31 });
+
+    expect(calls).toEqual([
+      ["move", { x: 320, y: 430 }, 0],
+      ["click"],
+      ["move", { x: 321, y: 431 }, 0],
+      ["click"],
+    ]);
+  });
+
   test("keeps mouse down and mouse up as separate operations", async () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -174,6 +328,7 @@ describe("Window", () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -186,6 +341,7 @@ describe("Window", () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -203,6 +359,7 @@ describe("Window", () => {
     const { automation } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -212,14 +369,15 @@ describe("Window", () => {
     });
   });
 
-  test("returns the window size", async () => {
+  test("returns the window size", () => {
     const { automation } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
-    expect(await window.size()).toEqual({
+    expect(window.size).toEqual({
       height: 600,
       width: 800,
     });
@@ -229,6 +387,7 @@ describe("Window", () => {
     const { automation } = createAutomation();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
     });
 
@@ -240,6 +399,7 @@ describe("Window", () => {
     const { calls, imageFinder } = createImageFinder();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
       imageFinder,
     });
@@ -263,6 +423,7 @@ describe("Window", () => {
     };
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
       imageFinder,
     });
@@ -276,6 +437,7 @@ describe("Window", () => {
     const { calls, imageFinder } = createImageFinder();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
       imageFinder,
     });
@@ -289,6 +451,7 @@ describe("Window", () => {
     const { imageFinder } = createImageFinder();
     const window = new Window(target, {
       automation,
+      bounds,
       boundsProvider,
       imageFinder,
     });

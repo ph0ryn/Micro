@@ -14,10 +14,11 @@ export type { WindowTarget } from "./window-bounds.ts";
 export { Window } from "./window.ts";
 
 export const getWindow = async (target: WindowTarget): Promise<Window> => {
-  await macWindowBoundsProvider.get(target);
+  const bounds = await macWindowBoundsProvider.get(target);
 
   return new Window(target, {
     automation: mouseAutomation,
+    bounds,
     boundsProvider: macWindowBoundsProvider,
     imageFinder: createImageFinder(macScreenCapture, opencvMatcher),
   });

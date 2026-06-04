@@ -23,6 +23,7 @@ export interface ScreenCapture {
 }
 
 export interface TemplateMatcher {
+  find(haystack: Bitmap, needle: Image, confidence: number): Promise<PixelMatch | null>;
   findAll(haystack: Bitmap, needle: Image, confidence: number): Promise<PixelMatch[]>;
 }
 
@@ -57,9 +58,14 @@ export const createImageFinder = (
   templateMatcher: TemplateMatcher,
 ): ImageFinder => ({
   async find(image, bounds, confidence): Promise<Match | null> {
-    const matches = await this.findAll(image, bounds, confidence);
+    const bitmap = await screenCapture.grab(bounds);
+    const match = await templateMatcher.find(bitmap, image, confidence);
 
-    return matches[0] ?? null;
+    if (!match) {
+      return null;
+    }
+
+    return toLogicalMatch(match, bitmap);
   },
 
   async findAll(image, bounds, confidence): Promise<Match[]> {

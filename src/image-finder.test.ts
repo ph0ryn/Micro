@@ -36,6 +36,17 @@ describe("createImageFinder", () => {
         },
       },
       {
+        async find(bitmap, needle, confidence) {
+          calls.push(["find", bitmap.width, needle, confidence]);
+
+          return {
+            confidence: 0.995,
+            height: 11,
+            width: 21,
+            x: 5,
+            y: 7,
+          };
+        },
         async findAll(bitmap, needle, confidence) {
           calls.push(["findAll", bitmap.width, needle, confidence]);
 
@@ -70,7 +81,7 @@ describe("createImageFinder", () => {
 
     expect(calls).toEqual([
       ["grab", bounds],
-      ["findAll", 160, image, 0.99],
+      ["find", 160, image, 0.99],
     ]);
   });
 
@@ -88,6 +99,9 @@ describe("createImageFinder", () => {
         },
       },
       {
+        async find() {
+          return null;
+        },
         async findAll() {
           return [];
         },
