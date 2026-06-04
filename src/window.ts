@@ -91,7 +91,9 @@ export class Window {
   async click(target?: Point): Promise<void> {
     await runWindowOperation(async () => {
       if (target) {
-        await this.moveInternal(target, 0);
+        const bounds = await this.refreshBoundsInternal();
+
+        await this.moveInternal(target, 0, bounds);
       }
 
       await this.automation.click();
@@ -129,7 +131,9 @@ export class Window {
   async mouseDown(target?: Point): Promise<void> {
     await runWindowOperation(async () => {
       if (target) {
-        await this.moveInternal(target, 0);
+        const bounds = await this.refreshBoundsInternal();
+
+        await this.moveInternal(target, 0, bounds);
       }
 
       await this.automation.mouseDown();
@@ -158,16 +162,18 @@ export class Window {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
+    const bounds = await this.refreshBoundsInternal();
 
-    return imageFinder.find(image, this.bounds, confidence);
+    return imageFinder.find(image, bounds, confidence);
   }
 
   async findAll(image: Image, confidence = 0.99): Promise<Match[]> {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();
+    const bounds = await this.refreshBoundsInternal();
 
-    return imageFinder.findAll(image, this.bounds, confidence);
+    return imageFinder.findAll(image, bounds, confidence);
   }
 
   private getImageFinder(): ImageFinder {

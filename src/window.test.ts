@@ -101,7 +101,7 @@ const createImageFinder = () => {
 };
 
 describe("Window", () => {
-  test("uses initial bounds without repeated provider calls", async () => {
+  test("uses initial bounds for synchronous size reads", async () => {
     const { automation, calls } = createAutomation();
     let getCalls = 0;
     const window = new Window(target, {
@@ -144,9 +144,7 @@ describe("Window", () => {
       width: 800,
     });
 
-    await window.click({ x: 20, y: 30 });
-
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
+    expect(calls).toEqual([]);
     expect(getCalls).toBe(0);
   });
 
@@ -221,7 +219,16 @@ describe("Window", () => {
           };
         },
         async get(): Promise<WindowBounds> {
-          return bounds;
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
         },
       },
     });
@@ -233,17 +240,33 @@ describe("Window", () => {
     expect(automationCalls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
   });
 
-  test("uses window-relative coordinates for movement and clicking", async () => {
+  test("refreshes bounds for window-relative clicking", async () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
       bounds,
-      boundsProvider,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
     });
 
     await window.click({ x: 20, y: 30 });
 
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
+    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
   });
 
   test("clicks at the current cursor position without a target", async () => {
@@ -406,6 +429,37 @@ describe("Window", () => {
 
     expect(await window.find(image)).toEqual(match);
     expect(calls).toEqual([["find", image, bounds, 0.99]]);
+  });
+
+  test("refreshes bounds before finding images", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    const refreshedBounds: WindowBounds = {
+      origin: {
+        x: 300,
+        y: 400,
+      },
+      size: {
+        height: 700,
+        width: 900,
+      },
+    };
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          return refreshedBounds;
+        },
+      },
+      imageFinder,
+    });
+
+    expect(await window.find(image)).toEqual(match);
+    expect(calls).toEqual([["find", image, refreshedBounds, 0.99]]);
   });
 
   test("returns null for a missing image", async () => {
