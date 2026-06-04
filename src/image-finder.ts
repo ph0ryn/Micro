@@ -27,7 +27,7 @@ export interface TemplateMatcher {
 }
 
 export interface ImageFinder {
-  find(image: Image, bounds: WindowBounds, confidence: number): Promise<Match>;
+  find(image: Image, bounds: WindowBounds, confidence: number): Promise<Match | null>;
   findAll(image: Image, bounds: WindowBounds, confidence: number): Promise<Match[]>;
 }
 
@@ -56,15 +56,10 @@ export const createImageFinder = (
   screenCapture: ScreenCapture,
   templateMatcher: TemplateMatcher,
 ): ImageFinder => ({
-  async find(image, bounds, confidence): Promise<Match> {
+  async find(image, bounds, confidence): Promise<Match | null> {
     const matches = await this.findAll(image, bounds, confidence);
-    const match = matches[0];
 
-    if (!match) {
-      throw new Error("Image not found in window");
-    }
-
-    return match;
+    return matches[0] ?? null;
   },
 
   async findAll(image, bounds, confidence): Promise<Match[]> {

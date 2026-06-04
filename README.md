@@ -75,16 +75,20 @@ const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 const button = await loadImage("assets/button.png");
 
 const match = await chrome.find(button);
-await chrome.click(match.center);
+if (match) {
+  await chrome.click(match.center);
+}
 
 const matches = await chrome.findAll(button, 0.95);
 ```
 
 `loadImage()` loads a reusable opaque `Image` from a PNG template. Transparent
 template pixels are excluded from matching. `find()` returns the first
-top-left threshold match and throws if no match is found. `findAll()` returns
+top-left threshold match, or `null` if no match is found. `findAll()` returns
 non-overlapping threshold matches in top-left order, or an empty array if none
-are found. Both methods use a default confidence threshold of `0.99`.
+are found. Both methods use a default confidence threshold of `0.99`. Invalid
+confidence values, missing image search configuration, and capture failures
+still throw.
 
 Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
 and sizes are window-relative logical pixels and may be fractional.

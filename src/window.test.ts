@@ -248,6 +248,29 @@ describe("Window", () => {
     expect(calls).toEqual([["find", image, bounds, 0.99]]);
   });
 
+  test("returns null for a missing image", async () => {
+    const { automation } = createAutomation();
+    const calls: unknown[][] = [];
+    const imageFinder: ImageFinder = {
+      async find(needle, searchBounds, confidence) {
+        calls.push(["find", needle, searchBounds, confidence]);
+
+        return null;
+      },
+      async findAll() {
+        return [];
+      },
+    };
+    const window = new Window(target, {
+      automation,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(await window.find(image)).toBeNull();
+    expect(calls).toEqual([["find", image, bounds, 0.99]]);
+  });
+
   test("finds all images with an explicit confidence", async () => {
     const { automation } = createAutomation();
     const { calls, imageFinder } = createImageFinder();

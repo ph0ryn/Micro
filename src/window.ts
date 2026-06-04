@@ -147,7 +147,7 @@ export class Window {
     return bounds.size;
   }
 
-  async find(image: Image, confidence = 0.99): Promise<Match> {
+  async find(image: Image, confidence = 0.99): Promise<Match | null> {
     assertConfidence(confidence);
 
     const imageFinder = this.getImageFinder();

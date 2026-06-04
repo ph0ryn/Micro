@@ -36,7 +36,7 @@ class Image {
 loadImage(imagePath: string): Promise<Image>;
 
 class Window {
-  find(image: Image, confidence?: number): Promise<Match>;
+  find(image: Image, confidence?: number): Promise<Match | null>;
   findAll(image: Image, confidence?: number): Promise<Match[]>;
 }
 ```
@@ -56,10 +56,12 @@ methods without inspecting its internal representation.
 - `confidence` is an optional threshold from `0` to `1`.
 - The default confidence threshold is `0.99`.
 - `Window.find()` returns the first threshold match in top-left order.
-- `Window.find()` throws if no match meets the threshold.
+- `Window.find()` returns `null` if no match meets the threshold.
 - `Window.findAll()` returns non-overlapping threshold matches in top-left
   order.
 - `Window.findAll()` returns an empty array if no match meets the threshold.
+- Invalid confidence values, missing image search configuration, and capture
+  failures still throw.
 
 ## Match Coordinates
 

@@ -74,7 +74,7 @@ describe("createImageFinder", () => {
     ]);
   });
 
-  test("throws for a missing single match and returns an empty match list", async () => {
+  test("returns null for a missing single match and returns an empty match list", async () => {
     const finder = createImageFinder(
       {
         async grab() {
@@ -94,7 +94,7 @@ describe("createImageFinder", () => {
       },
     );
 
-    expect(finder.find(image, bounds, 0.99)).rejects.toThrow("Image not found");
+    expect(await finder.find(image, bounds, 0.99)).toBeNull();
     expect(await finder.findAll(image, bounds, 0.99)).toEqual([]);
   });
 });
