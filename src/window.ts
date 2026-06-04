@@ -79,14 +79,17 @@ export class Window {
     await runWindowOperation(() => this.boundsProvider.focus(this.target));
   }
 
-  async click(target: Point, durationMs: number): Promise<void> {
+  async click(target?: Point): Promise<void> {
     await runWindowOperation(async () => {
-      await this.moveInternal(target, durationMs);
+      if (target) {
+        await this.moveInternal(target, 0);
+      }
+
       await this.automation.click();
     });
   }
 
-  async fclick(target: Point, durationMs: number, fuzzy: number): Promise<void> {
+  async fclick(target: Point, fuzzy: number): Promise<void> {
     await runWindowOperation(async () => {
       if (!Number.isFinite(fuzzy) || fuzzy < 0) {
         throw new Error("fuzzy must be a non-negative finite number");
@@ -107,14 +110,17 @@ export class Window {
         ),
       };
 
-      await this.moveInternal(fuzzed, durationMs);
+      await this.moveInternal(fuzzed, 0);
       await this.automation.click();
     });
   }
 
-  async mouseDown(target: Point, durationMs: number): Promise<void> {
+  async mouseDown(target?: Point): Promise<void> {
     await runWindowOperation(async () => {
-      await this.moveInternal(target, durationMs);
+      if (target) {
+        await this.moveInternal(target, 0);
+      }
+
       await this.automation.mouseDown();
     });
   }

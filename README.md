@@ -10,7 +10,6 @@ window moves.
 ## Requirements
 
 - macOS
-- pnpm
 - Bun
 - Accessibility permission for the terminal or application running the script
 - Screen Recording permission for the terminal or application running the
@@ -21,13 +20,13 @@ The selected window must be visible on a display.
 ## Install
 
 ```sh
-pnpm install
+pnpm add @ph0ryn/micro
 ```
 
 ## Usage
 
 ```ts
-import { checkRequirements, getWindow, point } from "micro";
+import { checkRequirements, getWindow, point } from "@ph0ryn/micro";
 
 await checkRequirements();
 
@@ -35,10 +34,11 @@ const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 
 await chrome.focus();
 await chrome.move(point(100, 200), 300);
-await chrome.click(point(100, 200), 300);
-await chrome.fclick(point(100, 200), 300, 10);
+await chrome.click(point(100, 200));
+await chrome.click();
+await chrome.fclick(point(100, 200), 10);
 
-await chrome.mouseDown(point(100, 200), 300);
+await chrome.mouseDown(point(100, 200));
 await chrome.move(point(500, 600), 800);
 await chrome.mouseUp();
 
@@ -46,10 +46,11 @@ const cursor = await chrome.cursor();
 const size = await chrome.size();
 ```
 
-All durations are in milliseconds. `fclick()` uses the final argument as a
-pixel radius and clamps the generated point to the window. `cursor()` returns
-window-relative coordinates even when the cursor is currently outside the
-window. `size()` returns the current window width and height.
+Move durations are in milliseconds. `click()` and `mouseDown()` use the current
+cursor position when called without a target. `fclick()` uses the final argument
+as a pixel radius and clamps the generated point to the window. `cursor()`
+returns window-relative coordinates even when the cursor is currently outside
+the window. `size()` returns the current window width and height.
 
 To list bundle IDs for visible applications:
 
@@ -68,13 +69,13 @@ se.applicationProcesses
 ### Image Search
 
 ```ts
-import { getWindow, loadImage } from "micro";
+import { getWindow, loadImage } from "@ph0ryn/micro";
 
 const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 const button = await loadImage("assets/button.png");
 
 const match = await chrome.find(button);
-await chrome.click(match.center, 300);
+await chrome.click(match.center);
 
 const matches = await chrome.findAll(button, 0.95);
 ```
@@ -97,12 +98,3 @@ want to check Screen Recording permission as well as the default macOS and
 Accessibility requirements.
 If a required permission is missing, Micro opens the matching macOS Settings
 pane and throws an error.
-
-## Scripts
-
-| Command           | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `pnpm install`    | Install dependencies and configure Git hooks.    |
-| `pnpm run lint`   | Run Oxlint type-aware linting and type checking. |
-| `pnpm run format` | Run lint fixes, oxfmt, and ESLint fixes.         |
-| `pnpm run test`   | Run Bun unit tests.                              |

@@ -126,9 +126,21 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    await window.click({ x: 20, y: 30 }, 400);
+    await window.click({ x: 20, y: 30 });
 
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 400], ["click"]]);
+    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
+  });
+
+  test("clicks at the current cursor position without a target", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      boundsProvider,
+    });
+
+    await window.click();
+
+    expect(calls).toEqual([["click"]]);
   });
 
   test("clamps fuzzy clicks to the window", async () => {
@@ -140,9 +152,9 @@ describe("Window", () => {
       random: () => randomValues.shift() ?? 0,
     });
 
-    await window.fclick({ x: 2, y: 598 }, 200, 10);
+    await window.fclick({ x: 2, y: 598 }, 10);
 
-    expect(calls).toEqual([["move", { x: 100, y: 799 }, 200], ["click"]]);
+    expect(calls).toEqual([["move", { x: 100, y: 799 }, 0], ["click"]]);
   });
 
   test("keeps mouse down and mouse up as separate operations", async () => {
@@ -152,10 +164,22 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    await window.mouseDown({ x: 10, y: 20 }, 300);
+    await window.mouseDown({ x: 10, y: 20 });
     await window.mouseUp();
 
-    expect(calls).toEqual([["move", { x: 110, y: 220 }, 300], ["mouseDown"], ["mouseUp"]]);
+    expect(calls).toEqual([["move", { x: 110, y: 220 }, 0], ["mouseDown"], ["mouseUp"]]);
+  });
+
+  test("presses the mouse at the current cursor position without a target", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      boundsProvider,
+    });
+
+    await window.mouseDown();
+
+    expect(calls).toEqual([["mouseDown"]]);
   });
 
   test("keeps concurrent click sequences together", async () => {
@@ -165,12 +189,12 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    await Promise.all([window.click({ x: 10, y: 20 }, 300), window.click({ x: 30, y: 40 }, 500)]);
+    await Promise.all([window.click({ x: 10, y: 20 }), window.click({ x: 30, y: 40 })]);
 
     expect(calls).toEqual([
-      ["move", { x: 110, y: 220 }, 300],
+      ["move", { x: 110, y: 220 }, 0],
       ["click"],
-      ["move", { x: 130, y: 240 }, 500],
+      ["move", { x: 130, y: 240 }, 0],
       ["click"],
     ]);
   });
