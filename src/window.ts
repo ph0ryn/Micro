@@ -19,6 +19,11 @@ export interface WindowDependencies {
   random?: () => number;
 }
 
+interface MoveOptions {
+  bounds?: WindowBounds;
+  safeWait?: boolean;
+}
+
 const assertDuration = (durationMs: number): void => {
   if (!Number.isFinite(durationMs) || durationMs < 0) {
     throw new Error("durationMs must be a non-negative finite number");
@@ -43,6 +48,10 @@ const assertPointInWindow = (target: Point, bounds: WindowBounds): void => {
     throw new Error(`Point (${target.x}, ${target.y}) is outside the window`);
   }
 };
+
+const pointerSettleMs = 100;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 let windowOperation = Promise.resolve();
 
@@ -74,8 +83,8 @@ export class Window {
     this.random = dependencies.random ?? Math.random;
   }
 
-  async move(target: Point, durationMs: number): Promise<void> {
-    await runWindowOperation(() => this.moveInternal(target, durationMs));
+  async move(target: Point, durationMs: number, safeWait = true): Promise<void> {
+    await runWindowOperation(() => this.moveInternal(target, durationMs, { safeWait }));
   }
 
   async focus(): Promise<void> {
@@ -93,7 +102,7 @@ export class Window {
       if (target) {
         const bounds = await this.refreshBoundsInternal();
 
-        await this.moveInternal(target, 0, bounds);
+        await this.moveInternal(target, 0, { bounds });
       }
 
       await this.automation.click();
@@ -123,7 +132,7 @@ export class Window {
         ),
       };
 
-      await this.moveInternal(fuzzed, 0, bounds);
+      await this.moveInternal(fuzzed, 0, { bounds });
       await this.automation.click();
     });
   }
@@ -133,7 +142,7 @@ export class Window {
       if (target) {
         const bounds = await this.refreshBoundsInternal();
 
-        await this.moveInternal(target, 0, bounds);
+        await this.moveInternal(target, 0, { bounds });
       }
 
       await this.automation.mouseDown();
@@ -206,12 +215,17 @@ export class Window {
   private async moveInternal(
     target: Point,
     durationMs: number,
-    bounds?: WindowBounds,
+    options: MoveOptions = {},
   ): Promise<void> {
     assertDuration(durationMs);
 
+    const { bounds, safeWait = true } = options;
     const absolute = await this.toAbsolute(target, bounds);
 
     await this.automation.move(absolute, durationMs);
+
+    if (safeWait) {
+      await sleep(pointerSettleMs);
+    }
   }
 }

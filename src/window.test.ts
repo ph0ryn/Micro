@@ -100,6 +100,14 @@ const createImageFinder = () => {
   };
 };
 
+const measureElapsed = async (operation: () => Promise<void>): Promise<number> => {
+  const start = performance.now();
+
+  await operation();
+
+  return performance.now() - start;
+};
+
 describe("Window", () => {
   test("uses initial bounds for synchronous size reads", async () => {
     const { automation, calls } = createAutomation();
@@ -197,6 +205,34 @@ describe("Window", () => {
     expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
   });
 
+  test("waits after moving by default", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+    });
+
+    const elapsed = await measureElapsed(() => window.move({ x: 20, y: 30 }, 0));
+
+    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0]]);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
+  });
+
+  test("can skip waiting after moving", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+    });
+
+    const elapsed = await measureElapsed(() => window.move({ x: 20, y: 30 }, 0, false));
+
+    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0]]);
+    expect(elapsed).toBeLessThan(90);
+  });
+
   test("focuses the target application window and refreshes bounds", async () => {
     const { automation, calls: automationCalls } = createAutomation();
     const calls: WindowTarget[] = [];
@@ -264,9 +300,10 @@ describe("Window", () => {
       },
     });
 
-    await window.click({ x: 20, y: 30 });
+    const elapsed = await measureElapsed(() => window.click({ x: 20, y: 30 }));
 
     expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
   test("clicks at the current cursor position without a target", async () => {
@@ -277,9 +314,10 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    await window.click();
+    const elapsed = await measureElapsed(() => window.click());
 
     expect(calls).toEqual([["click"]]);
+    expect(elapsed).toBeLessThan(90);
   });
 
   test("clamps fuzzy clicks to the window", async () => {
@@ -292,9 +330,10 @@ describe("Window", () => {
       random: () => randomValues.shift() ?? 0,
     });
 
-    await window.fclick({ x: 2, y: 598 }, 10);
+    const elapsed = await measureElapsed(() => window.fclick({ x: 2, y: 598 }, 10));
 
     expect(calls).toEqual([["move", { x: 100, y: 799 }, 0], ["click"]]);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
   test("uses freshly fetched bounds consistently for fuzzy clicks", async () => {
@@ -341,10 +380,12 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    await window.mouseDown({ x: 10, y: 20 });
+    const elapsed = await measureElapsed(() => window.mouseDown({ x: 10, y: 20 }));
+
     await window.mouseUp();
 
     expect(calls).toEqual([["move", { x: 110, y: 220 }, 0], ["mouseDown"], ["mouseUp"]]);
+    expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
   test("presses the mouse at the current cursor position without a target", async () => {
