@@ -1,6 +1,6 @@
 {
   "name": "@ph0ryn/micro",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Window-relative macOS automation helpers for TypeScript, built on nut.js",
   "repository": {
     "type": "git",
