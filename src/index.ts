@@ -7,6 +7,7 @@ import { Window } from "./window.ts";
 
 export { Image, loadImage } from "./image.ts";
 export { point } from "./types.ts";
+export { sleep } from "./util.ts";
 export { checkRequirements } from "./requirements.ts";
 export type { CheckRequirementsOptions } from "./requirements.ts";
 export type { Match, Point, Size } from "./types.ts";

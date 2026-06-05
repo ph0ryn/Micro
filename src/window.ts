@@ -1,3 +1,5 @@
+import { sleep } from "./util.ts";
+
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
 import type { Match, Point, Size } from "./types.ts";
@@ -50,8 +52,6 @@ const assertPointInWindow = (target: Point, bounds: WindowBounds): void => {
 };
 
 const pointerSettleMs = 100;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 let windowOperation = Promise.resolve();
 
