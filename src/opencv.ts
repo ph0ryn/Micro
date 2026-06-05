@@ -1,124 +1,13 @@
-import loadOpenCv from "opencv-js-wasm";
-
-import { unwrapImage, type Image } from "./image.ts";
+import { getImageTemplateData } from "./image.ts";
+import { createMat, getOpenCv } from "./opencv-runtime.ts";
 
 import type { PixelMatch, TemplateMatcher } from "./image-finder.ts";
-
-interface OpenCvMat {
-  data32F: Float32Array;
-  data8U: Uint8Array;
-  delete(): void;
-}
-
-interface OpenCv {
-  CV_8UC1: number;
-  CV_8UC3: number;
-  Mat: new (rows?: number, columns?: number, type?: number) => OpenCvMat;
-  TM_SQDIFF: number;
-  matFromArray(rows: number, columns: number, type: number, data: ArrayLike<number>): OpenCvMat;
-  matchTemplate(
-    haystack: OpenCvMat,
-    needle: OpenCvMat,
-    result: OpenCvMat,
-    method: number,
-    mask?: OpenCvMat,
-  ): void;
-}
-
-let openCvPromise: Promise<OpenCv> | undefined = undefined;
-
-const getOpenCv = (): Promise<OpenCv> => {
-  openCvPromise ??= loadOpenCv() as unknown as Promise<OpenCv>;
-
-  return openCvPromise;
-};
 
 const overlaps = (left: PixelMatch, right: PixelMatch): boolean =>
   left.x < right.x + right.width &&
   left.x + left.width > right.x &&
   left.y < right.y + right.height &&
   left.y + left.height > right.y;
-
-interface MatData {
-  columns: number;
-  data: ArrayLike<number>;
-  rows: number;
-  type: number;
-}
-
-const createMat = (cv: OpenCv, input: MatData): OpenCvMat =>
-  cv.matFromArray(input.rows, input.columns, input.type, input.data);
-
-interface TemplateMats {
-  mask?: OpenCvMat;
-  needle: OpenCvMat;
-}
-
-interface TemplateData {
-  height: number;
-  mats: TemplateMats;
-  maxSquaredDifference: number;
-  width: number;
-}
-
-const templateCache = new WeakMap<Image, Promise<TemplateData>>();
-let templateFinalizer: FinalizationRegistry<TemplateMats> | undefined = undefined;
-
-if (typeof FinalizationRegistry !== "undefined") {
-  templateFinalizer = new FinalizationRegistry<TemplateMats>((mats) => {
-    mats.needle.delete();
-    mats.mask?.delete();
-  });
-}
-
-const createTemplateData = async (image: Image): Promise<TemplateData> => {
-  const needle = unwrapImage(image);
-  const cv = await getOpenCv();
-  const needleMat = createMat(cv, {
-    columns: needle.width,
-    data: needle.rgb,
-    rows: needle.height,
-    type: cv.CV_8UC3,
-  });
-  let maskMat: OpenCvMat | undefined = undefined;
-
-  if (needle.visiblePixels !== needle.width * needle.height) {
-    maskMat = createMat(cv, {
-      columns: needle.width,
-      data: needle.alphaMask,
-      rows: needle.height,
-      type: cv.CV_8UC1,
-    });
-  }
-
-  const mats = {
-    mask: maskMat,
-    needle: needleMat,
-  };
-
-  templateFinalizer?.register(image, mats);
-
-  return {
-    height: needle.height,
-    mats,
-    maxSquaredDifference: needle.visiblePixels * 3 * 255 * 255,
-    width: needle.width,
-  };
-};
-
-const getTemplateData = (image: Image): Promise<TemplateData> => {
-  const cached = templateCache.get(image);
-
-  if (cached) {
-    return cached;
-  }
-
-  const created = createTemplateData(image);
-
-  templateCache.set(image, created);
-
-  return created;
-};
 
 class MatchBuckets {
   private readonly buckets = new Map<string, PixelMatch[]>();
@@ -217,7 +106,7 @@ const findMatches = async <Result>(
   image: Parameters<TemplateMatcher["findAll"]>[1],
   callback: (result: MatchTemplateResult) => Result,
 ): Promise<Result> => {
-  const template = await getTemplateData(image);
+  const template = await getImageTemplateData(image);
 
   if (template.width > haystack.width || template.height > haystack.height) {
     return callback({
