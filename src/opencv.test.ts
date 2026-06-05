@@ -65,6 +65,43 @@ describe("opencvMatcher", () => {
     expect(matches[0]?.confidence).toBe(1);
   });
 
+  test("reuses opaque templates across searches", async () => {
+    const needle = image({ height: 1, rgb: [10, 20, 30], width: 1 });
+
+    expect(await opencvMatcher.find(bitmap(1, 1, [10, 20, 30]), needle, 0.99)).toMatchObject({
+      confidence: 1,
+      height: 1,
+      width: 1,
+      x: 0,
+      y: 0,
+    });
+
+    expect(await opencvMatcher.find(bitmap(1, 1, [100, 110, 120]), needle, 0.99)).toBeNull();
+  });
+
+  test("reuses masked templates across searches", async () => {
+    const needle = image({
+      alphaMask: [1, 0],
+      height: 1,
+      rgb: [10, 20, 30, 255, 255, 255],
+      width: 2,
+    });
+
+    expect(
+      await opencvMatcher.find(bitmap(2, 1, [10, 20, 30, 100, 110, 120]), needle, 0.99),
+    ).toMatchObject({
+      confidence: 1,
+      height: 1,
+      width: 2,
+      x: 0,
+      y: 0,
+    });
+
+    expect(
+      await opencvMatcher.find(bitmap(2, 1, [100, 110, 120, 10, 20, 30]), needle, 0.99),
+    ).toBeNull();
+  });
+
   test("returns top-left non-overlapping threshold matches", async () => {
     const matches = await opencvMatcher.findAll(
       bitmap(4, 1, [10, 20, 30, 10, 20, 30, 10, 20, 30, 10, 20, 30]),

@@ -1,6 +1,6 @@
 import loadOpenCv from "opencv-js-wasm";
 
-import { unwrapImage } from "./image.ts";
+import { unwrapImage, type Image } from "./image.ts";
 
 import type { PixelMatch, TemplateMatcher } from "./image-finder.ts";
 
@@ -21,7 +21,7 @@ interface OpenCv {
     needle: OpenCvMat,
     result: OpenCvMat,
     method: number,
-    mask: OpenCvMat,
+    mask?: OpenCvMat,
   ): void;
 }
 
@@ -48,6 +48,77 @@ interface MatData {
 
 const createMat = (cv: OpenCv, input: MatData): OpenCvMat =>
   cv.matFromArray(input.rows, input.columns, input.type, input.data);
+
+interface TemplateMats {
+  mask?: OpenCvMat;
+  needle: OpenCvMat;
+}
+
+interface TemplateData {
+  height: number;
+  mats: TemplateMats;
+  maxSquaredDifference: number;
+  width: number;
+}
+
+const templateCache = new WeakMap<Image, Promise<TemplateData>>();
+let templateFinalizer: FinalizationRegistry<TemplateMats> | undefined = undefined;
+
+if (typeof FinalizationRegistry !== "undefined") {
+  templateFinalizer = new FinalizationRegistry<TemplateMats>((mats) => {
+    mats.needle.delete();
+    mats.mask?.delete();
+  });
+}
+
+const createTemplateData = async (image: Image): Promise<TemplateData> => {
+  const needle = unwrapImage(image);
+  const cv = await getOpenCv();
+  const needleMat = createMat(cv, {
+    columns: needle.width,
+    data: needle.rgb,
+    rows: needle.height,
+    type: cv.CV_8UC3,
+  });
+  let maskMat: OpenCvMat | undefined = undefined;
+
+  if (needle.visiblePixels !== needle.width * needle.height) {
+    maskMat = createMat(cv, {
+      columns: needle.width,
+      data: needle.alphaMask,
+      rows: needle.height,
+      type: cv.CV_8UC1,
+    });
+  }
+
+  const mats = {
+    mask: maskMat,
+    needle: needleMat,
+  };
+
+  templateFinalizer?.register(image, mats);
+
+  return {
+    height: needle.height,
+    mats,
+    maxSquaredDifference: needle.visiblePixels * 3 * 255 * 255,
+    width: needle.width,
+  };
+};
+
+const getTemplateData = (image: Image): Promise<TemplateData> => {
+  const cached = templateCache.get(image);
+
+  if (cached) {
+    return cached;
+  }
+
+  const created = createTemplateData(image);
+
+  templateCache.set(image, created);
+
+  return created;
+};
 
 class MatchBuckets {
   private readonly buckets = new Map<string, PixelMatch[]>();
@@ -146,13 +217,13 @@ const findMatches = async <Result>(
   image: Parameters<TemplateMatcher["findAll"]>[1],
   callback: (result: MatchTemplateResult) => Result,
 ): Promise<Result> => {
-  const needle = unwrapImage(image);
+  const template = await getTemplateData(image);
 
-  if (needle.width > haystack.width || needle.height > haystack.height) {
+  if (template.width > haystack.width || template.height > haystack.height) {
     return callback({
       maxSquaredDifference: 0,
-      needleHeight: needle.height,
-      needleWidth: needle.width,
+      needleHeight: template.height,
+      needleWidth: template.width,
       resultData: new Float32Array(),
       resultHeight: 0,
       resultWidth: 0,
@@ -166,35 +237,31 @@ const findMatches = async <Result>(
     rows: haystack.height,
     type: cv.CV_8UC3,
   });
-  const needleMat = createMat(cv, {
-    columns: needle.width,
-    data: needle.rgb,
-    rows: needle.height,
-    type: cv.CV_8UC3,
-  });
-  const maskMat = createMat(cv, {
-    columns: needle.width,
-    data: needle.alphaMask,
-    rows: needle.height,
-    type: cv.CV_8UC1,
-  });
   const resultMat = new cv.Mat();
 
   try {
-    cv.matchTemplate(haystackMat, needleMat, resultMat, cv.TM_SQDIFF, maskMat);
+    if (template.mats.mask) {
+      cv.matchTemplate(
+        haystackMat,
+        template.mats.needle,
+        resultMat,
+        cv.TM_SQDIFF,
+        template.mats.mask,
+      );
+    } else {
+      cv.matchTemplate(haystackMat, template.mats.needle, resultMat, cv.TM_SQDIFF);
+    }
 
     return callback({
-      maxSquaredDifference: needle.visiblePixels * 3 * 255 * 255,
-      needleHeight: needle.height,
-      needleWidth: needle.width,
+      maxSquaredDifference: template.maxSquaredDifference,
+      needleHeight: template.height,
+      needleWidth: template.width,
       resultData: resultMat.data32F,
-      resultHeight: haystack.height - needle.height + 1,
-      resultWidth: haystack.width - needle.width + 1,
+      resultHeight: haystack.height - template.height + 1,
+      resultWidth: haystack.width - template.width + 1,
     });
   } finally {
     haystackMat.delete();
-    needleMat.delete();
-    maskMat.delete();
     resultMat.delete();
   }
 };
