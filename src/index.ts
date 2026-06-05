@@ -10,7 +10,7 @@ export { point } from "./types.ts";
 export { sleep } from "./util.ts";
 export { checkRequirements } from "./requirements.ts";
 export type { CheckRequirementsOptions } from "./requirements.ts";
-export type { Match, Point, Size } from "./types.ts";
+export type { FindOptions, Match, Point, Size } from "./types.ts";
 export type { WindowTarget } from "./window-bounds.ts";
 export { Window } from "./window.ts";
 

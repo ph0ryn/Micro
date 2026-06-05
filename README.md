@@ -70,26 +70,33 @@ se.applicationProcesses
 ### Image Search
 
 ```ts
-import { getWindow, loadImage } from "@ph0ryn/micro";
+import { getWindow, loadImage, point } from "@ph0ryn/micro";
 
 const chrome = await getWindow({ bundleId: "com.google.Chrome" });
 const button = await loadImage("assets/button.png");
+const searchRange = {
+  start: point(100, 200),
+  end: point(500, 360),
+};
 
-const match = await chrome.find(button);
+const match = await chrome.find(button, searchRange);
 if (match) {
   await chrome.click(match.center);
 }
 
-const matches = await chrome.findAll(button, 0.95);
+const matches = await chrome.findAll(button, { ...searchRange, confidence: 0.95 });
 ```
 
 `loadImage()` loads a reusable opaque `Image` from a PNG template. Transparent
-template pixels are excluded from matching. `find()` returns the first
+template pixels are excluded from matching. `find()` and `findAll()` search
+inside the window-relative range from `start` to `end`. Omitted `start` defaults
+to the window top-left corner, and omitted `end` defaults to the window
+lower-right edge. `end` may match the window edge. `find()` returns the first
 top-left threshold match, or `null` if no match is found. `findAll()` returns
 non-overlapping threshold matches in top-left order, or an empty array if none
 are found. Both methods use a default confidence threshold of `0.99`. Invalid
-confidence values, missing image search configuration, and capture failures
-still throw.
+confidence values, invalid search ranges, missing image search configuration,
+and capture failures still throw.
 
 Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
 and sizes are window-relative logical pixels and may be fractional.

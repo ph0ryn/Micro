@@ -2,7 +2,7 @@ import { sleep } from "./util.ts";
 
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
-import type { Match, Point, Size } from "./types.ts";
+import type { FindOptions, Match, Point, Size } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
 
 export interface Automation {
@@ -24,6 +24,12 @@ export interface WindowDependencies {
 interface MoveOptions {
   bounds?: WindowBounds;
   safeWait?: boolean;
+}
+
+interface ResolvedFindOptions {
+  confidence: number;
+  end: Point;
+  start: Point;
 }
 
 const assertDuration = (durationMs: number): void => {
@@ -50,6 +56,66 @@ const assertPointInWindow = (target: Point, bounds: WindowBounds): void => {
     throw new Error(`Point (${target.x}, ${target.y}) is outside the window`);
   }
 };
+
+const resolveFindOptions = (input: unknown, bounds: WindowBounds): ResolvedFindOptions => {
+  if (typeof input !== "object" || input === null) {
+    throw new Error("find options must be an object");
+  }
+
+  const options = input as FindOptions;
+
+  return {
+    confidence: options.confidence ?? 0.99,
+    end: options.end ?? {
+      x: bounds.size.width,
+      y: bounds.size.height,
+    },
+    start: options.start ?? {
+      x: 0,
+      y: 0,
+    },
+  };
+};
+
+const assertFindOptions = (options: ResolvedFindOptions, bounds: WindowBounds): void => {
+  if (
+    !Number.isFinite(options.start.x) ||
+    !Number.isFinite(options.start.y) ||
+    !Number.isFinite(options.end.x) ||
+    !Number.isFinite(options.end.y) ||
+    options.start.x < 0 ||
+    options.start.y < 0 ||
+    options.end.x > bounds.size.width ||
+    options.end.y > bounds.size.height ||
+    options.end.x <= options.start.x ||
+    options.end.y <= options.start.y
+  ) {
+    throw new Error("Search range must be inside the window with end after start");
+  }
+};
+
+const toFindBounds = (bounds: WindowBounds, options: ResolvedFindOptions): WindowBounds => ({
+  origin: {
+    x: bounds.origin.x + options.start.x,
+    y: bounds.origin.y + options.start.y,
+  },
+  size: {
+    height: options.end.y - options.start.y,
+    width: options.end.x - options.start.x,
+  },
+});
+
+const offsetMatch = (match: Match, offset: Point): Match => ({
+  ...match,
+  center: {
+    x: match.center.x + offset.x,
+    y: match.center.y + offset.y,
+  },
+  origin: {
+    x: match.origin.x + offset.x,
+    y: match.origin.y + offset.y,
+  },
+});
 
 const pointerSettleMs = 100;
 
@@ -167,22 +233,34 @@ export class Window {
     return this.bounds.size;
   }
 
-  async find(image: Image, confidence = 0.99): Promise<Match | null> {
-    assertConfidence(confidence);
-
+  async find(image: Image, options: FindOptions = {}): Promise<Match | null> {
     const imageFinder = this.getImageFinder();
     const bounds = await this.refreshBoundsInternal();
+    const resolvedOptions = resolveFindOptions(options, bounds);
 
-    return imageFinder.find(image, bounds, confidence);
+    assertConfidence(resolvedOptions.confidence);
+    assertFindOptions(resolvedOptions, bounds);
+    const searchBounds = toFindBounds(bounds, resolvedOptions);
+    const match = await imageFinder.find(image, searchBounds, resolvedOptions.confidence);
+
+    if (!match) {
+      return null;
+    }
+
+    return offsetMatch(match, resolvedOptions.start);
   }
 
-  async findAll(image: Image, confidence = 0.99): Promise<Match[]> {
-    assertConfidence(confidence);
-
+  async findAll(image: Image, options: FindOptions = {}): Promise<Match[]> {
     const imageFinder = this.getImageFinder();
     const bounds = await this.refreshBoundsInternal();
+    const resolvedOptions = resolveFindOptions(options, bounds);
 
-    return imageFinder.findAll(image, bounds, confidence);
+    assertConfidence(resolvedOptions.confidence);
+    assertFindOptions(resolvedOptions, bounds);
+    const searchBounds = toFindBounds(bounds, resolvedOptions);
+    const matches = await imageFinder.findAll(image, searchBounds, resolvedOptions.confidence);
+
+    return matches.map((match) => offsetMatch(match, resolvedOptions.start));
   }
 
   private getImageFinder(): ImageFinder {

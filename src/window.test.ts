@@ -79,6 +79,40 @@ const match: Match = {
   },
 };
 
+const findOptions = {
+  end: {
+    x: 110,
+    y: 220,
+  },
+  start: {
+    x: 10,
+    y: 20,
+  },
+};
+
+const offsetMatch: Match = {
+  ...match,
+  center: {
+    x: 40,
+    y: 70,
+  },
+  origin: {
+    x: 30,
+    y: 60,
+  },
+};
+
+const searchBounds: WindowBounds = {
+  origin: {
+    x: 110,
+    y: 220,
+  },
+  size: {
+    height: 200,
+    width: 100,
+  },
+};
+
 const createImageFinder = () => {
   const calls: unknown[][] = [];
   const imageFinder: ImageFinder = {
@@ -458,7 +492,7 @@ describe("Window", () => {
     expect(window.move({ x: 800, y: 0 }, 0)).rejects.toThrow("outside the window");
   });
 
-  test("finds images with a default confidence", async () => {
+  test("finds images with a default confidence in the requested range", async () => {
     const { automation } = createAutomation();
     const { calls, imageFinder } = createImageFinder();
     const window = new Window(target, {
@@ -468,11 +502,64 @@ describe("Window", () => {
       imageFinder,
     });
 
-    expect(await window.find(image)).toEqual(match);
-    expect(calls).toEqual([["find", image, bounds, 0.99]]);
+    expect(await window.find(image, findOptions)).toEqual(offsetMatch);
+    expect(calls).toEqual([["find", image, searchBounds, 0.99]]);
   });
 
-  test("refreshes bounds before finding images", async () => {
+  test("defaults missing find range endpoints to the window edges", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(await window.find(image, { end: findOptions.end })).toEqual(match);
+
+    expect(await window.findAll(image, { confidence: 0.9, start: findOptions.start })).toEqual([
+      offsetMatch,
+    ]);
+
+    expect(await window.find(image)).toEqual(match);
+
+    expect(calls).toEqual([
+      [
+        "find",
+        image,
+        {
+          origin: {
+            x: 100,
+            y: 200,
+          },
+          size: {
+            height: 220,
+            width: 110,
+          },
+        },
+        0.99,
+      ],
+      [
+        "findAll",
+        image,
+        {
+          origin: {
+            x: 110,
+            y: 220,
+          },
+          size: {
+            height: 580,
+            width: 790,
+          },
+        },
+        0.9,
+      ],
+      ["find", image, bounds, 0.99],
+    ]);
+  });
+
+  test("refreshes bounds before finding images in the requested range", async () => {
     const { automation } = createAutomation();
     const { calls, imageFinder } = createImageFinder();
     const refreshedBounds: WindowBounds = {
@@ -499,8 +586,25 @@ describe("Window", () => {
       imageFinder,
     });
 
-    expect(await window.find(image)).toEqual(match);
-    expect(calls).toEqual([["find", image, refreshedBounds, 0.99]]);
+    expect(await window.find(image, findOptions)).toEqual(offsetMatch);
+
+    expect(calls).toEqual([
+      [
+        "find",
+        image,
+        {
+          origin: {
+            x: 310,
+            y: 420,
+          },
+          size: {
+            height: 200,
+            width: 100,
+          },
+        },
+        0.99,
+      ],
+    ]);
   });
 
   test("returns null for a missing image", async () => {
@@ -523,8 +627,8 @@ describe("Window", () => {
       imageFinder,
     });
 
-    expect(await window.find(image)).toBeNull();
-    expect(calls).toEqual([["find", image, bounds, 0.99]]);
+    expect(await window.find(image, findOptions)).toBeNull();
+    expect(calls).toEqual([["find", image, searchBounds, 0.99]]);
   });
 
   test("finds all images with an explicit confidence", async () => {
@@ -537,8 +641,8 @@ describe("Window", () => {
       imageFinder,
     });
 
-    expect(await window.findAll(image, 0.9)).toEqual([match]);
-    expect(calls).toEqual([["findAll", image, bounds, 0.9]]);
+    expect(await window.findAll(image, { ...findOptions, confidence: 0.9 })).toEqual([offsetMatch]);
+    expect(calls).toEqual([["findAll", image, searchBounds, 0.9]]);
   });
 
   test("rejects invalid confidence", () => {
@@ -551,7 +655,62 @@ describe("Window", () => {
       imageFinder,
     });
 
-    expect(window.find(image, 2)).rejects.toThrow("confidence must be between 0 and 1");
-    expect(window.findAll(image, Number.NaN)).rejects.toThrow("confidence must be between 0 and 1");
+    expect(window.find(image, { ...findOptions, confidence: 2 })).rejects.toThrow(
+      "confidence must be between 0 and 1",
+    );
+
+    expect(window.findAll(image, { ...findOptions, confidence: Number.NaN })).rejects.toThrow(
+      "confidence must be between 0 and 1",
+    );
+  });
+
+  test("rejects non-object find options", () => {
+    const { automation } = createAutomation();
+    const { imageFinder } = createImageFinder();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(window.find(image, 0.9 as never)).rejects.toThrow("find options must be an object");
+  });
+
+  test("rejects invalid find ranges", () => {
+    const { automation } = createAutomation();
+    const { imageFinder } = createImageFinder();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(
+      window.find(image, {
+        end: {
+          x: 10,
+          y: 20,
+        },
+        start: {
+          x: 10,
+          y: 20,
+        },
+      }),
+    ).rejects.toThrow("Search range must be inside the window");
+
+    expect(
+      window.findAll(image, {
+        end: {
+          x: 801,
+          y: 600,
+        },
+        start: {
+          x: 0,
+          y: 0,
+        },
+      }),
+    ).rejects.toThrow("Search range must be inside the window");
   });
 });

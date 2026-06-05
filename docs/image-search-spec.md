@@ -29,6 +29,12 @@ type Match = {
   center: Point;
 };
 
+type FindOptions = {
+  confidence?: number;
+  start?: Point;
+  end?: Point;
+};
+
 class Image {
   private constructor();
 }
@@ -36,8 +42,8 @@ class Image {
 loadImage(imagePath: string): Promise<Image>;
 
 class Window {
-  find(image: Image, confidence?: number): Promise<Match | null>;
-  findAll(image: Image, confidence?: number): Promise<Match[]>;
+  find(image: Image, options?: FindOptions): Promise<Match | null>;
+  findAll(image: Image, options?: FindOptions): Promise<Match[]>;
 }
 ```
 
@@ -52,7 +58,12 @@ methods without inspecting its internal representation.
 
 ## Matching Behavior
 
-- `Window.find()` and `Window.findAll()` search inside the selected window.
+- `Window.find()` and `Window.findAll()` search inside the selected
+  window-relative range from `start` to `end`.
+- Omitted `start` defaults to the selected window top-left corner.
+- Omitted `end` defaults to the selected window lower-right edge.
+- `end` is the lower-right edge of the search range and may match the selected
+  window edge.
 - `confidence` is an optional threshold from `0` to `1`.
 - The default confidence threshold is `0.99`.
 - `Window.find()` returns the first threshold match in top-left order.
@@ -60,8 +71,8 @@ methods without inspecting its internal representation.
 - `Window.findAll()` returns non-overlapping threshold matches in top-left
   order.
 - `Window.findAll()` returns an empty array if no match meets the threshold.
-- Invalid confidence values, missing image search configuration, and capture
-  failures still throw.
+- Invalid confidence values, invalid search ranges, missing image search
+  configuration, and capture failures still throw.
 
 ## Match Coordinates
 

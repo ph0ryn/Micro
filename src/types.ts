@@ -15,4 +15,10 @@ export interface Match {
   size: Size;
 }
 
+export interface FindOptions {
+  confidence?: number;
+  end?: Point;
+  start?: Point;
+}
+
 export const point = (x: number, y: number): Point => ({ x, y });
