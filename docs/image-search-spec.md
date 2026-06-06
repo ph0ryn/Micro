@@ -33,13 +33,21 @@ type FindOptions = {
   confidence?: number;
   start?: Point;
   end?: Point;
+  refreshBounds?: boolean;
 };
+
+type GetWindowOptions = {
+  cacheBounds?: boolean;
+};
+
+type WindowTarget = { bundleId: string } | { name: string };
 
 class Image {
   private constructor();
 }
 
 loadImage(imagePath: string): Promise<Image>;
+getWindow(target: WindowTarget, options?: GetWindowOptions): Promise<Window>;
 
 class Window {
   find(image: Image, options?: FindOptions): Promise<Match | null>;
@@ -66,6 +74,10 @@ methods without inspecting its internal representation.
   window edge.
 - `confidence` is an optional threshold from `0` to `1`.
 - The default confidence threshold is `0.99`.
+- `refreshBounds` overrides whether the search refreshes window bounds before
+  capture.
+- `cacheBounds` reuses cached window bounds by default for window-relative
+  operations that otherwise refresh bounds.
 - `Window.find()` returns the first threshold match in top-left order.
 - `Window.find()` returns `null` if no match meets the threshold.
 - `Window.findAll()` returns non-overlapping threshold matches in top-left

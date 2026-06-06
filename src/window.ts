@@ -2,7 +2,7 @@ import { sleep } from "./util.ts";
 
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
-import type { FindOptions, Match, Point, Size } from "./types.ts";
+import type { BoundsOptions, FindOptions, Match, MoveOptions, Point, Size } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
 
 export interface Automation {
@@ -17,19 +17,20 @@ export interface WindowDependencies {
   automation: Automation;
   bounds: WindowBounds;
   boundsProvider: WindowBoundsProvider;
+  cacheBounds?: boolean;
   imageFinder?: ImageFinder;
   random?: () => number;
-}
-
-interface MoveOptions {
-  bounds?: WindowBounds;
-  safeWait?: boolean;
 }
 
 interface ResolvedFindOptions {
   confidence: number;
   end: Point;
   start: Point;
+}
+
+interface InternalMoveOptions {
+  bounds?: WindowBounds;
+  safeWait?: boolean;
 }
 
 const assertDuration = (durationMs: number): void => {
@@ -57,25 +58,49 @@ const assertPointInWindow = (target: Point, bounds: WindowBounds): void => {
   }
 };
 
-const resolveFindOptions = (input: unknown, bounds: WindowBounds): ResolvedFindOptions => {
+const assertRefreshBoundsOption = (options: BoundsOptions): void => {
+  if (options.refreshBounds !== undefined && typeof options.refreshBounds !== "boolean") {
+    throw new Error("refreshBounds must be a boolean");
+  }
+};
+
+const toFindOptions = (input: unknown): FindOptions => {
   if (typeof input !== "object" || input === null) {
     throw new Error("find options must be an object");
   }
 
   const options = input as FindOptions;
 
-  return {
-    confidence: options.confidence ?? 0.99,
-    end: options.end ?? {
-      x: bounds.size.width,
-      y: bounds.size.height,
-    },
-    start: options.start ?? {
-      x: 0,
-      y: 0,
-    },
-  };
+  assertRefreshBoundsOption(options);
+
+  return options;
 };
+
+const toMoveOptions = (input: boolean | MoveOptions | undefined): MoveOptions => {
+  if (typeof input === "boolean") {
+    return {
+      safeWait: input,
+    };
+  }
+
+  const options = input ?? {};
+
+  assertRefreshBoundsOption(options);
+
+  return options;
+};
+
+const resolveFindOptions = (options: FindOptions, bounds: WindowBounds): ResolvedFindOptions => ({
+  confidence: options.confidence ?? 0.99,
+  end: options.end ?? {
+    x: bounds.size.width,
+    y: bounds.size.height,
+  },
+  start: options.start ?? {
+    x: 0,
+    y: 0,
+  },
+});
 
 const assertFindOptions = (options: ResolvedFindOptions, bounds: WindowBounds): void => {
   if (
@@ -136,6 +161,7 @@ export class Window {
   private readonly target: WindowTarget;
   private readonly automation: Automation;
   private readonly boundsProvider: WindowBoundsProvider;
+  private readonly cacheBounds: boolean;
   private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
   private bounds: WindowBounds;
@@ -145,12 +171,25 @@ export class Window {
     this.automation = dependencies.automation;
     this.bounds = dependencies.bounds;
     this.boundsProvider = dependencies.boundsProvider;
+    this.cacheBounds = dependencies.cacheBounds ?? false;
     this.imageFinder = dependencies.imageFinder;
     this.random = dependencies.random ?? Math.random;
   }
 
-  async move(target: Point, durationMs: number, safeWait = true): Promise<void> {
-    await runWindowOperation(() => this.moveInternal(target, durationMs, { safeWait }));
+  async move(
+    target: Point,
+    durationMs: number,
+    options: boolean | MoveOptions = {},
+  ): Promise<void> {
+    await runWindowOperation(async () => {
+      const moveOptions = toMoveOptions(options);
+      const bounds = await this.getOperationBounds(moveOptions, false);
+
+      await this.moveInternal(target, durationMs, {
+        bounds,
+        safeWait: moveOptions.safeWait,
+      });
+    });
   }
 
   async focus(): Promise<void> {
@@ -163,10 +202,11 @@ export class Window {
     return runWindowOperation(() => this.refreshBoundsInternal());
   }
 
-  async click(target?: Point): Promise<void> {
+  async click(target?: Point, options: BoundsOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
       if (target) {
-        const bounds = await this.refreshBoundsInternal();
+        assertRefreshBoundsOption(options);
+        const bounds = await this.getOperationBounds(options, true);
 
         await this.moveInternal(target, 0, { bounds });
       }
@@ -175,15 +215,14 @@ export class Window {
     });
   }
 
-  async fclick(target: Point, fuzzy: number): Promise<void> {
+  async fclick(target: Point, fuzzy: number, options: BoundsOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
       if (!Number.isFinite(fuzzy) || fuzzy < 0) {
         throw new Error("fuzzy must be a non-negative finite number");
       }
 
-      const bounds = await this.boundsProvider.get(this.target);
-
-      this.bounds = bounds;
+      assertRefreshBoundsOption(options);
+      const bounds = await this.getOperationBounds(options, true);
 
       assertPointInWindow(target, bounds);
 
@@ -203,10 +242,11 @@ export class Window {
     });
   }
 
-  async mouseDown(target?: Point): Promise<void> {
+  async mouseDown(target?: Point, options: BoundsOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
       if (target) {
-        const bounds = await this.refreshBoundsInternal();
+        assertRefreshBoundsOption(options);
+        const bounds = await this.getOperationBounds(options, true);
 
         await this.moveInternal(target, 0, { bounds });
       }
@@ -235,8 +275,9 @@ export class Window {
 
   async find(image: Image, options: FindOptions = {}): Promise<Match | null> {
     const imageFinder = this.getImageFinder();
-    const bounds = await this.refreshBoundsInternal();
-    const resolvedOptions = resolveFindOptions(options, bounds);
+    const findOptions = toFindOptions(options);
+    const bounds = await this.getOperationBounds(findOptions, true);
+    const resolvedOptions = resolveFindOptions(findOptions, bounds);
 
     assertConfidence(resolvedOptions.confidence);
     assertFindOptions(resolvedOptions, bounds);
@@ -252,8 +293,9 @@ export class Window {
 
   async findAll(image: Image, options: FindOptions = {}): Promise<Match[]> {
     const imageFinder = this.getImageFinder();
-    const bounds = await this.refreshBoundsInternal();
-    const resolvedOptions = resolveFindOptions(options, bounds);
+    const findOptions = toFindOptions(options);
+    const bounds = await this.getOperationBounds(findOptions, true);
+    const resolvedOptions = resolveFindOptions(findOptions, bounds);
 
     assertConfidence(resolvedOptions.confidence);
     assertFindOptions(resolvedOptions, bounds);
@@ -269,6 +311,17 @@ export class Window {
     }
 
     return this.imageFinder;
+  }
+
+  private async getOperationBounds(
+    options: BoundsOptions,
+    defaultRefresh: boolean,
+  ): Promise<WindowBounds> {
+    if (options.refreshBounds ?? (defaultRefresh && !this.cacheBounds)) {
+      return this.refreshBoundsInternal();
+    }
+
+    return this.bounds;
   }
 
   private async refreshBoundsInternal(): Promise<WindowBounds> {
@@ -293,7 +346,7 @@ export class Window {
   private async moveInternal(
     target: Point,
     durationMs: number,
-    options: MoveOptions = {},
+    options: InternalMoveOptions = {},
   ): Promise<void> {
     assertDuration(durationMs);
 

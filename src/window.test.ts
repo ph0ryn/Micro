@@ -267,6 +267,35 @@ describe("Window", () => {
     expect(elapsed).toBeLessThan(90);
   });
 
+  test("can refresh bounds before moving", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+    });
+
+    await window.move({ x: 20, y: 30 }, 0, { refreshBounds: true, safeWait: false });
+
+    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0]]);
+  });
+
   test("focuses the target application window and refreshes bounds", async () => {
     const { automation, calls: automationCalls } = createAutomation();
     const calls: WindowTarget[] = [];
@@ -338,6 +367,40 @@ describe("Window", () => {
 
     expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
     expect(elapsed).toBeGreaterThanOrEqual(90);
+  });
+
+  test("can use cached bounds for window-relative clicking", async () => {
+    const { automation, calls } = createAutomation();
+    let getCalls = 0;
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          getCalls += 1;
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+      cacheBounds: true,
+    });
+
+    await window.click({ x: 20, y: 30 });
+
+    expect(getCalls).toBe(0);
+    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
   });
 
   test("clicks at the current cursor position without a target", async () => {
@@ -607,6 +670,124 @@ describe("Window", () => {
     ]);
   });
 
+  test("uses cached bounds for image search when configured", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    let getCalls = 0;
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          getCalls += 1;
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+      cacheBounds: true,
+      imageFinder,
+    });
+
+    expect(await window.find(image, findOptions)).toEqual(offsetMatch);
+    expect(getCalls).toBe(0);
+    expect(calls).toEqual([["find", image, searchBounds, 0.99]]);
+  });
+
+  test("can refresh bounds for one search when cached bounds are configured", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    const refreshedBounds: WindowBounds = {
+      origin: {
+        x: 300,
+        y: 400,
+      },
+      size: {
+        height: 700,
+        width: 900,
+      },
+    };
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          return refreshedBounds;
+        },
+      },
+      cacheBounds: true,
+      imageFinder,
+    });
+
+    expect(await window.find(image, { ...findOptions, refreshBounds: true })).toEqual(offsetMatch);
+
+    expect(calls).toEqual([
+      [
+        "find",
+        image,
+        {
+          origin: {
+            x: 310,
+            y: 420,
+          },
+          size: {
+            height: 200,
+            width: 100,
+          },
+        },
+        0.99,
+      ],
+    ]);
+  });
+
+  test("can skip bounds refresh for one search", async () => {
+    const { automation } = createAutomation();
+    const { calls, imageFinder } = createImageFinder();
+    let getCalls = 0;
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider: {
+        async focusAndGet(): Promise<WindowBounds> {
+          return bounds;
+        },
+        async get(): Promise<WindowBounds> {
+          getCalls += 1;
+
+          return {
+            origin: {
+              x: 300,
+              y: 400,
+            },
+            size: {
+              height: 700,
+              width: 900,
+            },
+          };
+        },
+      },
+      imageFinder,
+    });
+
+    expect(await window.find(image, { ...findOptions, refreshBounds: false })).toEqual(offsetMatch);
+    expect(getCalls).toBe(0);
+    expect(calls).toEqual([["find", image, searchBounds, 0.99]]);
+  });
+
   test("returns null for a missing image", async () => {
     const { automation } = createAutomation();
     const calls: unknown[][] = [];
@@ -675,6 +856,21 @@ describe("Window", () => {
     });
 
     expect(window.find(image, 0.9 as never)).rejects.toThrow("find options must be an object");
+  });
+
+  test("rejects invalid refreshBounds options", () => {
+    const { automation } = createAutomation();
+    const { imageFinder } = createImageFinder();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+      imageFinder,
+    });
+
+    expect(window.find(image, { refreshBounds: "false" } as never)).rejects.toThrow(
+      "refreshBounds must be a boolean",
+    );
   });
 
   test("rejects invalid find ranges", () => {

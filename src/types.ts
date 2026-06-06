@@ -15,10 +15,18 @@ export interface Match {
   size: Size;
 }
 
-export interface FindOptions {
+export interface BoundsOptions {
+  refreshBounds?: boolean;
+}
+
+export interface FindOptions extends BoundsOptions {
   confidence?: number;
   end?: Point;
   start?: Point;
+}
+
+export interface MoveOptions extends BoundsOptions {
+  safeWait?: boolean;
 }
 
 export const point = (x: number, y: number): Point => ({ x, y });

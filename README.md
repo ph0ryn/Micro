@@ -30,7 +30,7 @@ import { checkRequirements, getWindow, point } from "@ph0ryn/micro";
 
 await checkRequirements();
 
-const chrome = await getWindow({ bundleId: "com.google.Chrome" });
+const chrome = await getWindow({ bundleId: "com.google.Chrome" }, { cacheBounds: true });
 
 await chrome.focus();
 await chrome.move(point(100, 200), 300);
@@ -72,7 +72,7 @@ se.applicationProcesses
 ```ts
 import { getWindow, loadImage, point } from "@ph0ryn/micro";
 
-const chrome = await getWindow({ bundleId: "com.google.Chrome" });
+const chrome = await getWindow({ bundleId: "com.google.Chrome" }, { cacheBounds: true });
 const button = await loadImage("assets/button.png");
 const searchRange = {
   start: point(100, 200),
@@ -84,7 +84,11 @@ if (match) {
   await chrome.click(match.center);
 }
 
-const matches = await chrome.findAll(button, { ...searchRange, confidence: 0.95 });
+const matches = await chrome.findAll(button, {
+  ...searchRange,
+  confidence: 0.95,
+  refreshBounds: false,
+});
 ```
 
 `loadImage()` loads a reusable opaque `Image` from a PNG template. Transparent
@@ -97,6 +101,12 @@ non-overlapping threshold matches in top-left order, or an empty array if none
 are found. Both methods use a default confidence threshold of `0.99`. Invalid
 confidence values, invalid search ranges, missing image search configuration,
 and capture failures still throw.
+
+`getWindow()` refreshes bounds once when the window is created. By default,
+window-relative operations refresh bounds again when they need current window
+geometry. Pass `{ cacheBounds: true }` to `getWindow()` to reuse cached bounds by
+default, or pass `refreshBounds` on a specific `move()`, `click()`, `fclick()`,
+`mouseDown()`, `find()`, or `findAll()` call to override that behavior.
 
 Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
 and sizes are window-relative logical pixels and may be fractional.

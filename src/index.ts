@@ -10,17 +10,25 @@ export { point } from "./types.ts";
 export { sleep } from "./util.ts";
 export { checkRequirements } from "./requirements.ts";
 export type { CheckRequirementsOptions } from "./requirements.ts";
-export type { FindOptions, Match, Point, Size } from "./types.ts";
+export type { BoundsOptions, FindOptions, Match, MoveOptions, Point, Size } from "./types.ts";
 export type { WindowTarget } from "./window-bounds.ts";
 export { Window } from "./window.ts";
 
-export const getWindow = async (target: WindowTarget): Promise<Window> => {
+export interface GetWindowOptions {
+  cacheBounds?: boolean;
+}
+
+export const getWindow = async (
+  target: WindowTarget,
+  options: GetWindowOptions = {},
+): Promise<Window> => {
   const bounds = await macWindowBoundsProvider.get(target);
 
   return new Window(target, {
     automation: mouseAutomation,
     bounds,
     boundsProvider: macWindowBoundsProvider,
+    cacheBounds: options.cacheBounds,
     imageFinder: createImageFinder(macScreenCapture, opencvMatcher),
   });
 };
