@@ -477,25 +477,12 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    const elapsed = await measureElapsed(() => window.mouseDown({ x: 10, y: 20 }));
+    const elapsed = await measureElapsed(() => window.mouseDown());
 
     await window.mouseUp();
 
-    expect(calls).toEqual([["move", { x: 110, y: 220 }, 0], ["mouseDown"], ["mouseUp"]]);
-    expect(elapsed).toBeGreaterThanOrEqual(90);
-  });
-
-  test("presses the mouse at the current cursor position without a target", async () => {
-    const { automation, calls } = createAutomation();
-    const window = new Window(target, {
-      automation,
-      bounds,
-      boundsProvider,
-    });
-
-    await window.mouseDown();
-
-    expect(calls).toEqual([["mouseDown"]]);
+    expect(calls).toEqual([["mouseDown"], ["mouseUp"]]);
+    expect(elapsed).toBeLessThan(90);
   });
 
   test("keeps concurrent click sequences together", async () => {

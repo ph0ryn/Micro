@@ -38,7 +38,7 @@ await chrome.click(point(100, 200));
 await chrome.click();
 await chrome.fclick(point(100, 200), 10);
 
-await chrome.mouseDown(point(100, 200));
+await chrome.mouseDown();
 await chrome.move(point(500, 600), 800);
 await chrome.mouseUp();
 
@@ -46,12 +46,13 @@ const cursor = await chrome.cursor();
 const size = chrome.size;
 ```
 
-Move durations are in milliseconds. `click()` and `mouseDown()` use the current
-cursor position when called without a target. `fclick()` uses the final argument
-as a pixel radius and clamps the generated point to the window. `cursor()`
-returns window-relative coordinates even when the cursor is currently outside
-the window. `size` returns the cached window width and height. Call
-`refreshBounds()` after moving or resizing the window outside Micro.
+Move durations are in milliseconds. `click()` uses the current cursor position
+when called without a target, and `mouseDown()` always uses the current cursor
+position. `fclick()` uses the final argument as a pixel radius and clamps the
+generated point to the window. `cursor()` returns window-relative coordinates
+even when the cursor is currently outside the window. `size` returns the cached
+window width and height. Call `refreshBounds()` after moving or resizing the
+window outside Micro.
 
 To list bundle IDs for visible applications:
 
@@ -106,7 +107,7 @@ and capture failures still throw.
 window-relative operations refresh bounds again when they need current window
 geometry. Pass `{ cacheBounds: true }` to `getWindow()` to reuse cached bounds by
 default, or pass `refreshBounds` on a specific `move()`, `click()`, `fclick()`,
-`mouseDown()`, `find()`, or `findAll()` call to override that behavior.
+`find()`, or `findAll()` call to override that behavior.
 
 Each `Match` exposes `confidence`, `origin`, `size`, and `center`. Coordinates
 and sizes are window-relative logical pixels and may be fractional.

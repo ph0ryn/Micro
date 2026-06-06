@@ -242,17 +242,8 @@ export class Window {
     });
   }
 
-  async mouseDown(target?: Point, options: BoundsOptions = {}): Promise<void> {
-    await runWindowOperation(async () => {
-      if (target) {
-        assertRefreshBoundsOption(options);
-        const bounds = await this.getOperationBounds(options, true);
-
-        await this.moveInternal(target, 0, { bounds });
-      }
-
-      await this.automation.mouseDown();
-    });
+  async mouseDown(): Promise<void> {
+    await runWindowOperation(() => this.automation.mouseDown());
   }
 
   async mouseUp(): Promise<void> {
