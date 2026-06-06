@@ -1,82 +1,80 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
-
-import { loadImage } from "@nut-tree-fork/nut-js";
+import { Monitor } from "node-screenshots";
 
 import type { Bitmap, ScreenCapture } from "./image-finder.ts";
 import type { WindowBounds } from "./window-bounds.ts";
 
-const execFileAsync = promisify(execFile);
-
-export interface NutImage {
-  byteWidth: number;
-  channels: number;
-  colorMode: number;
-  data: Buffer;
+export interface CapturedImage {
   height: number;
-  pixelDensity: {
-    scaleX: number;
-    scaleY: number;
-  };
   width: number;
+  cropSync(x: number, y: number, width: number, height: number): CapturedImage;
+  toRawSync(copyOutputData?: boolean | null): Buffer;
+}
+
+export interface ScreenMonitor {
+  captureImageSync(): CapturedImage;
+  scaleFactor(): number;
+  x(): number;
+  y(): number;
 }
 
 export interface MacScreenCaptureDependencies {
-  capture(bounds: WindowBounds, path: string): Promise<void>;
-  load(path: string): Promise<NutImage>;
-  makeDirectory(): Promise<string>;
-  removeDirectory(path: string): Promise<void>;
+  findMonitor(x: number, y: number): ScreenMonitor | null;
 }
 
-export const normalizeScreenImage = (image: NutImage): Bitmap => {
-  const rgb = Buffer.alloc(image.width * image.height * 3);
-  const isRgb = image.colorMode === 1;
-  let redOffset = 2;
-  let blueOffset = 0;
+const rgbaToRgb = (image: CapturedImage): Buffer => {
+  const raw = image.toRawSync(false);
+  const pixelCount = image.width * image.height;
+  const rgb = Buffer.alloc(pixelCount * 3);
 
-  if (isRgb) {
-    redOffset = 0;
-    blueOffset = 2;
+  for (let source = 0, target = 0; source < pixelCount * 4; source += 4, target += 3) {
+    rgb[target] = raw[source] ?? 0;
+    rgb[target + 1] = raw[source + 1] ?? 0;
+    rgb[target + 2] = raw[source + 2] ?? 0;
   }
 
-  for (let y = 0; y < image.height; y += 1) {
-    for (let x = 0; x < image.width; x += 1) {
-      const source = y * image.byteWidth + x * image.channels;
-      const target = (y * image.width + x) * 3;
+  return rgb;
+};
 
-      rgb[target] = image.data[source + redOffset] ?? 0;
-      rgb[target + 1] = image.data[source + 1] ?? 0;
-      rgb[target + 2] = image.data[source + blueOffset] ?? 0;
-    }
-  }
+const cropBounds = (
+  monitor: ScreenMonitor,
+  bounds: WindowBounds,
+): {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+} => {
+  const scale = monitor.scaleFactor();
+
+  return {
+    height: Math.round(bounds.size.height * scale),
+    width: Math.round(bounds.size.width * scale),
+    x: Math.round((bounds.origin.x - monitor.x()) * scale),
+    y: Math.round((bounds.origin.y - monitor.y()) * scale),
+  };
+};
+
+export const createBitmap = (image: CapturedImage, bounds: WindowBounds): Bitmap => {
+  const scaleX = image.width / bounds.size.width;
+  const scaleY = image.height / bounds.size.height;
 
   return {
     height: image.height,
-    rgb,
-    scaleX: image.pixelDensity.scaleX,
-    scaleY: image.pixelDensity.scaleY,
+    rgb: rgbaToRgb(image),
+    scaleX,
+    scaleY,
     width: image.width,
   };
 };
 
+const assertCapturedSize = (image: CapturedImage, width: number, height: number): void => {
+  if (image.width !== width || image.height !== height) {
+    throw new Error("Capture bounds must be inside a single monitor");
+  }
+};
+
 const defaultDependencies: MacScreenCaptureDependencies = {
-  async capture(bounds, path): Promise<void> {
-    await execFileAsync("/usr/sbin/screencapture", [
-      "-x",
-      `-R${bounds.origin.x},${bounds.origin.y},${bounds.size.width},${bounds.size.height}`,
-      path,
-    ]);
-  },
-  load: loadImage,
-  async makeDirectory(): Promise<string> {
-    return mkdtemp(join(tmpdir(), "micro-screen-"));
-  },
-  async removeDirectory(path): Promise<void> {
-    await rm(path, { force: true, recursive: true });
-  },
+  findMonitor: (x, y) => Monitor.fromPoint(x, y),
 };
 
 export const createMacScreenCapture = (
@@ -87,22 +85,19 @@ export const createMacScreenCapture = (
       throw new Error("Micro only supports macOS");
     }
 
-    const directory = await dependencies.makeDirectory();
-    const path = join(directory, "capture.png");
+    const monitor = dependencies.findMonitor(bounds.origin.x, bounds.origin.y);
 
-    try {
-      await dependencies.capture(bounds, path);
-
-      const bitmap = normalizeScreenImage(await dependencies.load(path));
-
-      return {
-        ...bitmap,
-        scaleX: bitmap.width / bounds.size.width,
-        scaleY: bitmap.height / bounds.size.height,
-      };
-    } finally {
-      await dependencies.removeDirectory(directory);
+    if (!monitor) {
+      throw new Error("Capture bounds must start inside a monitor");
     }
+
+    const source = monitor.captureImageSync();
+    const crop = cropBounds(monitor, bounds);
+    const image = source.cropSync(crop.x, crop.y, crop.width, crop.height);
+
+    assertCapturedSize(image, crop.width, crop.height);
+
+    return createBitmap(image, bounds);
   },
 });
 
