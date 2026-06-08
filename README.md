@@ -21,7 +21,6 @@ The selected window must be visible on a display.
 ## Install
 
 ```sh
-cargo install --git https://github.com/ph0ryn/silentmouse.git
 pnpm add @ph0ryn/micro
 ```
 
@@ -34,7 +33,6 @@ await checkRequirements();
 
 const chrome = await getWindow({ bundleId: "com.google.Chrome" }, { cacheFrame: true });
 
-await chrome.focus();
 await chrome.move(point(100, 200), 300);
 await chrome.click(point(100, 200));
 await chrome.click();
