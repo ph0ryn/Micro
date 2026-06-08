@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { findTargetScript, type WindowTarget } from "./window-bounds.ts";
+import {
+  createMacWindowBoundsProvider,
+  findTargetScript,
+  type WindowTarget,
+} from "./window-bounds.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -137,5 +141,80 @@ describe("findTargetScript", () => {
         },
       ]),
     ).rejects.toThrow("Window not found for application: Music");
+  });
+});
+
+describe("createMacWindowBoundsProvider", () => {
+  test("resolves a CGWindowID from matching window geometry", async () => {
+    const provider = createMacWindowBoundsProvider({
+      listWindows: () => [
+        {
+          height: 600,
+          id: 111,
+          pid: 12,
+          width: 800,
+          x: 100,
+          y: 200,
+          z: 1,
+        },
+        {
+          height: 700,
+          id: 222,
+          pid: 34,
+          width: 900,
+          x: 300,
+          y: 400,
+          z: 0,
+        },
+      ],
+      async runBoundsScript() {
+        return {
+          origin: {
+            x: 300,
+            y: 400,
+          },
+          pid: 34,
+          size: {
+            height: 700,
+            width: 900,
+          },
+        };
+      },
+    });
+
+    expect(await provider.get({ bundleId: "com.google.Chrome" })).toEqual({
+      origin: {
+        x: 300,
+        y: 400,
+      },
+      size: {
+        height: 700,
+        width: 900,
+      },
+      windowId: 222,
+    });
+  });
+
+  test("throws when the CGWindowID cannot be resolved", async () => {
+    const provider = createMacWindowBoundsProvider({
+      listWindows: () => [],
+      async runBoundsScript() {
+        return {
+          origin: {
+            x: 300,
+            y: 400,
+          },
+          pid: 34,
+          size: {
+            height: 700,
+            width: 900,
+          },
+        };
+      },
+    });
+
+    expect(provider.get({ bundleId: "com.google.Chrome" })).rejects.toThrow(
+      "CGWindowID not found for pid 34",
+    );
   });
 });

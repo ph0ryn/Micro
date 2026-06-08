@@ -4,7 +4,7 @@ import { type Automation, Window } from "./window.ts";
 
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
-import type { Match, Point } from "./types.ts";
+import type { Match } from "./types.ts";
 import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
 
 const target: WindowTarget = {
@@ -20,6 +20,7 @@ const bounds: WindowBounds = {
     height: 600,
     width: 800,
   },
+  windowId: 123,
 };
 
 const boundsProvider: WindowBoundsProvider = {
@@ -34,25 +35,19 @@ const boundsProvider: WindowBoundsProvider = {
 const createAutomation = () => {
   const calls: unknown[][] = [];
   const automation: Automation = {
-    async click(): Promise<void> {
-      calls.push(["click"]);
+    async click(windowId, target): Promise<void> {
+      calls.push(["click", windowId, target]);
     },
-    async getCursor(): Promise<Point> {
-      calls.push(["cursor"]);
+    async mouseDown(windowId, target): Promise<void> {
+      calls.push(["mouseDown", windowId, target]);
+    },
+    async mouseUp(windowId, target): Promise<void> {
+      calls.push(["mouseUp", windowId, target]);
+    },
+    async move(request): Promise<void> {
+      const { dragging, durationMs, from, target, windowId } = request;
 
-      return {
-        x: 150,
-        y: 260,
-      };
-    },
-    async mouseDown(): Promise<void> {
-      calls.push(["mouseDown"]);
-    },
-    async mouseUp(): Promise<void> {
-      calls.push(["mouseUp"]);
-    },
-    async move(target, durationMs): Promise<void> {
-      calls.push(["move", target, durationMs]);
+      calls.push(["move", windowId, target, durationMs, { dragging, from }]);
     },
   };
 
@@ -162,6 +157,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
         async get(): Promise<WindowBounds> {
@@ -176,6 +172,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -206,6 +203,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
         async get(): Promise<WindowBounds> {
@@ -218,6 +216,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -232,11 +231,15 @@ describe("Window", () => {
         height: 700,
         width: 900,
       },
+      windowId: 456,
     });
 
     await window.click({ x: 20, y: 30 });
 
-    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
+    expect(calls).toEqual([
+      ["move", 456, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 456, { x: 20, y: 30 }],
+    ]);
   });
 
   test("waits after moving by default", async () => {
@@ -249,7 +252,10 @@ describe("Window", () => {
 
     const elapsed = await measureElapsed(() => window.move({ x: 20, y: 30 }, 0));
 
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0]]);
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+    ]);
+
     expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
@@ -263,7 +269,10 @@ describe("Window", () => {
 
     const elapsed = await measureElapsed(() => window.move({ x: 20, y: 30 }, 0, false));
 
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0]]);
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+    ]);
+
     expect(elapsed).toBeLessThan(90);
   });
 
@@ -286,6 +295,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -293,7 +303,9 @@ describe("Window", () => {
 
     await window.move({ x: 20, y: 30 }, 0, { refreshBounds: true, safeWait: false });
 
-    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0]]);
+    expect(calls).toEqual([
+      ["move", 456, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+    ]);
   });
 
   test("focuses the target application window and refreshes bounds", async () => {
@@ -315,6 +327,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
         async get(): Promise<WindowBounds> {
@@ -327,6 +340,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -336,7 +350,11 @@ describe("Window", () => {
     await window.click({ x: 20, y: 30 });
 
     expect(calls).toEqual([target]);
-    expect(automationCalls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
+
+    expect(automationCalls).toEqual([
+      ["move", 456, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 456, { x: 20, y: 30 }],
+    ]);
   });
 
   test("refreshes bounds for window-relative clicking", async () => {
@@ -358,6 +376,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -365,7 +384,11 @@ describe("Window", () => {
 
     const elapsed = await measureElapsed(() => window.click({ x: 20, y: 30 }));
 
-    expect(calls).toEqual([["move", { x: 320, y: 430 }, 0], ["click"]]);
+    expect(calls).toEqual([
+      ["move", 456, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 456, { x: 20, y: 30 }],
+    ]);
+
     expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
@@ -391,6 +414,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -400,10 +424,14 @@ describe("Window", () => {
     await window.click({ x: 20, y: 30 });
 
     expect(getCalls).toBe(0);
-    expect(calls).toEqual([["move", { x: 120, y: 230 }, 0], ["click"]]);
+
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 123, { x: 20, y: 30 }],
+    ]);
   });
 
-  test("clicks at the current cursor position without a target", async () => {
+  test("clicks at the tracked cursor position without a target", async () => {
     const { automation, calls } = createAutomation();
     const window = new Window(target, {
       automation,
@@ -411,9 +439,15 @@ describe("Window", () => {
       boundsProvider,
     });
 
+    await window.move({ x: 20, y: 30 }, 0, false);
+
     const elapsed = await measureElapsed(() => window.click());
 
-    expect(calls).toEqual([["click"]]);
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 123, { x: 20, y: 30 }],
+    ]);
+
     expect(elapsed).toBeLessThan(90);
   });
 
@@ -429,7 +463,11 @@ describe("Window", () => {
 
     const elapsed = await measureElapsed(() => window.fclick({ x: 2, y: 598 }, 10));
 
-    expect(calls).toEqual([["move", { x: 100, y: 799 }, 0], ["click"]]);
+    expect(calls).toEqual([
+      ["move", 123, { x: 0, y: 599 }, 0, { dragging: false, from: undefined }],
+      ["click", 123, { x: 0, y: 599 }],
+    ]);
+
     expect(elapsed).toBeGreaterThanOrEqual(90);
   });
 
@@ -452,6 +490,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -462,10 +501,10 @@ describe("Window", () => {
     await window.click({ x: 21, y: 31 });
 
     expect(calls).toEqual([
-      ["move", { x: 320, y: 430 }, 0],
-      ["click"],
-      ["move", { x: 321, y: 431 }, 0],
-      ["click"],
+      ["move", 456, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["click", 456, { x: 20, y: 30 }],
+      ["move", 456, { x: 21, y: 31 }, 0, { dragging: false, from: { x: 20, y: 30 } }],
+      ["click", 456, { x: 21, y: 31 }],
     ]);
   });
 
@@ -477,12 +516,37 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    const elapsed = await measureElapsed(() => window.mouseDown());
+    const elapsed = await measureElapsed(() => window.mouseDown({ x: 20, y: 30 }));
 
     await window.mouseUp();
 
-    expect(calls).toEqual([["mouseDown"], ["mouseUp"]]);
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["mouseDown", 123, { x: 20, y: 30 }],
+      ["mouseUp", 123, { x: 20, y: 30 }],
+    ]);
+
     expect(elapsed).toBeLessThan(90);
+  });
+
+  test("tracks pressed state and sends drag moves after mouse down", async () => {
+    const { automation, calls } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
+    });
+
+    await window.mouseDown({ x: 20, y: 30 });
+    await window.move({ x: 40, y: 50 }, 0, false);
+    await window.mouseUp();
+
+    expect(calls).toEqual([
+      ["move", 123, { x: 20, y: 30 }, 0, { dragging: false, from: undefined }],
+      ["mouseDown", 123, { x: 20, y: 30 }],
+      ["move", 123, { x: 40, y: 50 }, 0, { dragging: true, from: { x: 20, y: 30 } }],
+      ["mouseUp", 123, { x: 40, y: 50 }],
+    ]);
   });
 
   test("keeps concurrent click sequences together", async () => {
@@ -496,14 +560,14 @@ describe("Window", () => {
     await Promise.all([window.click({ x: 10, y: 20 }), window.click({ x: 30, y: 40 })]);
 
     expect(calls).toEqual([
-      ["move", { x: 110, y: 220 }, 0],
-      ["click"],
-      ["move", { x: 130, y: 240 }, 0],
-      ["click"],
+      ["move", 123, { x: 10, y: 20 }, 0, { dragging: false, from: undefined }],
+      ["click", 123, { x: 10, y: 20 }],
+      ["move", 123, { x: 30, y: 40 }, 0, { dragging: false, from: { x: 10, y: 20 } }],
+      ["click", 123, { x: 30, y: 40 }],
     ]);
   });
 
-  test("returns the cursor position relative to the window", async () => {
+  test("returns the tracked cursor position", async () => {
     const { automation } = createAutomation();
     const window = new Window(target, {
       automation,
@@ -511,10 +575,20 @@ describe("Window", () => {
       boundsProvider,
     });
 
-    expect(await window.cursor()).toEqual({
-      x: 50,
-      y: 60,
+    await window.move({ x: 50, y: 60 }, 0, false);
+
+    expect(window.cursor).toEqual({ x: 50, y: 60 });
+  });
+
+  test("throws when the tracked cursor position is not initialized", () => {
+    const { automation } = createAutomation();
+    const window = new Window(target, {
+      automation,
+      bounds,
+      boundsProvider,
     });
+
+    expect(() => window.cursor).toThrow("Cursor position is not initialized");
   });
 
   test("returns the window size", () => {
@@ -605,7 +679,21 @@ describe("Window", () => {
         },
         0.9,
       ],
-      ["find", image, bounds, 0.99],
+      [
+        "find",
+        image,
+        {
+          origin: {
+            x: 100,
+            y: 200,
+          },
+          size: {
+            height: 600,
+            width: 800,
+          },
+        },
+        0.99,
+      ],
     ]);
   });
 
@@ -621,6 +709,7 @@ describe("Window", () => {
         height: 700,
         width: 900,
       },
+      windowId: 456,
     };
     const window = new Window(target, {
       automation,
@@ -680,6 +769,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },
@@ -704,6 +794,7 @@ describe("Window", () => {
         height: 700,
         width: 900,
       },
+      windowId: 456,
     };
     const window = new Window(target, {
       automation,
@@ -764,6 +855,7 @@ describe("Window", () => {
               height: 700,
               width: 900,
             },
+            windowId: 456,
           };
         },
       },

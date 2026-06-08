@@ -1,6 +1,6 @@
-import { open } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 
-import { loadImage as loadNutImage } from "@nut-tree-fork/nut-js";
+import { PNG } from "pngjs";
 
 import { createMat, getOpenCv, type OpenCvMat } from "./opencv-runtime.ts";
 
@@ -117,7 +117,7 @@ export const getImageTemplateData = (image: Image): Promise<ImageTemplateData> =
 export const loadImage = async (imagePath: string): Promise<Image> => {
   await assertPng(imagePath);
 
-  const decoded = await loadNutImage(imagePath);
+  const decoded = PNG.sync.read(await readFile(imagePath));
   const pixelCount = decoded.width * decoded.height;
   const rgb = Buffer.alloc(pixelCount * 3);
   const alphaMask = Buffer.alloc(pixelCount);
@@ -128,9 +128,9 @@ export const loadImage = async (imagePath: string): Promise<Image> => {
     const rgbOffset = pixel * 3;
     const alpha = decoded.data[decodedOffset + 3]!;
 
-    rgb[rgbOffset] = decoded.data[decodedOffset + 2]!;
+    rgb[rgbOffset] = decoded.data[decodedOffset]!;
     rgb[rgbOffset + 1] = decoded.data[decodedOffset + 1]!;
-    rgb[rgbOffset + 2] = decoded.data[decodedOffset]!;
+    rgb[rgbOffset + 2] = decoded.data[decodedOffset + 2]!;
 
     if (alpha !== 0) {
       alphaMask[pixel] = 1;
@@ -149,8 +149,6 @@ export const loadImage = async (imagePath: string): Promise<Image> => {
     visiblePixels,
     width: decoded.width,
   });
-
-  await getImageTemplateData(image);
 
   return image;
 };

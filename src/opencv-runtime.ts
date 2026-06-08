@@ -28,12 +28,18 @@ interface MatData {
   type: number;
 }
 
-let openCvPromise: Promise<OpenCv> | undefined = undefined;
+const openCvPromiseKey = Symbol.for("micro.openCvPromise");
+
+interface OpenCvGlobal {
+  [openCvPromiseKey]?: Promise<OpenCv>;
+}
+
+const openCvGlobal = globalThis as OpenCvGlobal;
 
 export const getOpenCv = (): Promise<OpenCv> => {
-  openCvPromise ??= loadOpenCv() as unknown as Promise<OpenCv>;
+  openCvGlobal[openCvPromiseKey] ??= loadOpenCv() as unknown as Promise<OpenCv>;
 
-  return openCvPromise;
+  return openCvGlobal[openCvPromiseKey];
 };
 
 export const createMat = (cv: OpenCv, input: MatData): OpenCvMat =>

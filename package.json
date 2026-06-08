@@ -1,7 +1,7 @@
 {
   "name": "@ph0ryn/micro",
   "version": "0.3.0",
-  "description": "Window-relative macOS automation helpers for TypeScript, built on nut.js",
+  "description": "Window-relative macOS automation helpers for TypeScript",
   "repository": {
     "type": "git",
     "url": "https://github.com/ph0ryn/micro.git"
@@ -22,7 +22,7 @@
     "lint": "oxlint --type-aware --type-check",
     "prepack": "clean-pkg-json -r devDependencies",
     "precommit": "pnpm run format",
-    "test": "bun test"
+    "test": "bun test src/window-bounds.test.ts src/util.test.ts src/opencv.test.ts src/requirements.test.ts && bun test src/screen.test.ts src/image.test.ts src/image-finder.test.ts && bun test src/window.test.ts"
   },
   "lint-staged": {
     "src/**/*.ts": [
@@ -39,14 +39,14 @@
     ]
   },
   "dependencies": {
-    "@nut-tree-fork/node-mac-permissions": "catalog:",
-    "@nut-tree-fork/nut-js": "catalog:",
     "node-screenshots": "catalog:",
-    "opencv-js-wasm": "catalog:"
+    "opencv-js-wasm": "catalog:",
+    "pngjs": "catalog:"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",
     "@types/bun": "catalog:",
+    "@types/pngjs": "catalog:",
     "@typescript/native-preview": "catalog:",
     "clean-pkg-json": "catalog:",
     "eslint": "catalog:",

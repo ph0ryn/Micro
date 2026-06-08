@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { getImageTemplateData, loadImage, unwrapImage } from "./image.ts";
+import { loadImage, unwrapImage } from "./image.ts";
 
 const FIXTURES = {
   fullyTransparent:
@@ -52,16 +52,6 @@ describe("loadImage", () => {
       visiblePixels: 2,
       width: 2,
     });
-
-    const template = await getImageTemplateData(image);
-
-    expect(template).toMatchObject({
-      height: 1,
-      maxSquaredDifference: 2 * 3 * 255 * 255,
-      width: 2,
-    });
-
-    expect(template.mats.mask).toBeUndefined();
   });
 
   test("excludes fully transparent pixels from the mask", async () => {
@@ -74,7 +64,7 @@ describe("loadImage", () => {
       visiblePixels: 1,
     });
 
-    expect((await getImageTemplateData(image)).mats.mask).toBeDefined();
+    expect(unwrapImage(image).alphaMask).toEqual(Buffer.from([0, 1]));
   });
 
   test("includes half-transparent pixels in the mask", async () => {

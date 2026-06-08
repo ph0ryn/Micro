@@ -6,11 +6,18 @@ import type { BoundsOptions, FindOptions, Match, MoveOptions, Point, Size } from
 import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
 
 export interface Automation {
-  click(): Promise<void>;
-  getCursor(): Promise<Point>;
-  mouseDown(): Promise<void>;
-  mouseUp(): Promise<void>;
-  move(target: Point, durationMs: number): Promise<void>;
+  click(windowId: number, target: Point): Promise<void>;
+  mouseDown(windowId: number, target: Point): Promise<void>;
+  mouseUp(windowId: number, target: Point): Promise<void>;
+  move(request: AutomationMoveRequest): Promise<void>;
+}
+
+export interface AutomationMoveRequest {
+  dragging?: boolean;
+  durationMs: number;
+  from?: Point;
+  target: Point;
+  windowId: number;
 }
 
 export interface WindowDependencies {
@@ -165,6 +172,8 @@ export class Window {
   private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
   private bounds: WindowBounds;
+  private currentCursor: Point | null = null;
+  private mousePressed = false;
 
   constructor(target: WindowTarget, dependencies: WindowDependencies) {
     this.target = target;
@@ -204,14 +213,16 @@ export class Window {
 
   async click(target?: Point, options: BoundsOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
+      let bounds = this.bounds;
+
       if (target) {
         assertRefreshBoundsOption(options);
-        const bounds = await this.getOperationBounds(options, true);
+        bounds = await this.getOperationBounds(options, true);
 
         await this.moveInternal(target, 0, { bounds });
       }
 
-      await this.automation.click();
+      await this.automation.click(this.requireWindowId(bounds), this.requireCursor());
     });
   }
 
@@ -238,26 +249,46 @@ export class Window {
       };
 
       await this.moveInternal(fuzzed, 0, { bounds });
-      await this.automation.click();
+      await this.automation.click(this.requireWindowId(bounds), this.requireCursor());
     });
   }
 
-  async mouseDown(): Promise<void> {
-    await runWindowOperation(() => this.automation.mouseDown());
+  async mouseDown(target?: Point, options: BoundsOptions = {}): Promise<void> {
+    await runWindowOperation(async () => {
+      let bounds = this.bounds;
+
+      if (target) {
+        assertRefreshBoundsOption(options);
+        bounds = await this.getOperationBounds(options, true);
+
+        await this.moveInternal(target, 0, { bounds, safeWait: false });
+      }
+
+      await this.automation.mouseDown(this.requireWindowId(bounds), this.requireCursor());
+      this.mousePressed = true;
+    });
   }
 
-  async mouseUp(): Promise<void> {
-    await runWindowOperation(() => this.automation.mouseUp());
+  async mouseUp(target?: Point, options: BoundsOptions = {}): Promise<void> {
+    await runWindowOperation(async () => {
+      let bounds = this.bounds;
+
+      if (target) {
+        assertRefreshBoundsOption(options);
+        bounds = await this.getOperationBounds(options, true);
+
+        await this.moveInternal(target, 0, { bounds, safeWait: false });
+      }
+
+      await this.automation.mouseUp(this.requireWindowId(bounds), this.requireCursor());
+      this.mousePressed = false;
+    });
   }
 
-  async cursor(): Promise<Point> {
-    const bounds = this.bounds;
-    const cursor = await this.automation.getCursor();
+  get cursor(): Point {
+    const cursor = this.requireCursor();
 
-    return {
-      x: cursor.x - bounds.origin.x,
-      y: cursor.y - bounds.origin.y,
-    };
+    return { ...cursor };
   }
 
   get size(): Size {
@@ -323,15 +354,28 @@ export class Window {
     return bounds;
   }
 
-  private async toAbsolute(target: Point, bounds?: WindowBounds): Promise<Point> {
+  private toWindowPoint(target: Point, bounds?: WindowBounds): Point {
     const resolvedBounds = bounds ?? this.bounds;
 
     assertPointInWindow(target, resolvedBounds);
 
-    return {
-      x: resolvedBounds.origin.x + target.x,
-      y: resolvedBounds.origin.y + target.y,
-    };
+    return { ...target };
+  }
+
+  private requireCursor(): Point {
+    if (!this.currentCursor) {
+      throw new Error("Cursor position is not initialized");
+    }
+
+    return this.currentCursor;
+  }
+
+  private requireWindowId(bounds: WindowBounds): number {
+    if (bounds.windowId === undefined) {
+      throw new Error("CGWindowID is not initialized");
+    }
+
+    return bounds.windowId;
   }
 
   private async moveInternal(
@@ -342,9 +386,19 @@ export class Window {
     assertDuration(durationMs);
 
     const { bounds, safeWait = true } = options;
-    const absolute = await this.toAbsolute(target, bounds);
+    const resolvedBounds = bounds ?? this.bounds;
+    const windowPoint = this.toWindowPoint(target, resolvedBounds);
+    const previousCursor = this.currentCursor ?? undefined;
 
-    await this.automation.move(absolute, durationMs);
+    await this.automation.move({
+      dragging: this.mousePressed,
+      durationMs,
+      from: previousCursor,
+      target: windowPoint,
+      windowId: this.requireWindowId(resolvedBounds),
+    });
+
+    this.currentCursor = windowPoint;
 
     if (safeWait) {
       await sleep(pointerSettleMs);

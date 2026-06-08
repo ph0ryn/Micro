@@ -2,8 +2,8 @@
 
 Small macOS automation helpers for TypeScript.
 
-Micro wraps [`@nut-tree-fork/nut-js`](https://www.npmjs.com/package/@nut-tree-fork/nut-js)
-with window-relative mouse operations. Coordinates are relative to the top-left
+Micro drives [`silentmouse`](https://github.com/ph0ryn/silentmouse) with
+window-relative mouse operations. Coordinates are relative to the top-left
 corner of the selected application window, so scripts keep working when the
 window moves.
 
@@ -11,6 +11,7 @@ window moves.
 
 - macOS
 - Bun
+- `silentmouse` on `PATH`, or `MICRO_SILENTMOUSE_PATH` pointing to the binary
 - Accessibility permission for the terminal or application running the script
 - Screen Recording permission for the terminal or application running the
   script when using image search
@@ -20,6 +21,7 @@ The selected window must be visible on a display.
 ## Install
 
 ```sh
+cargo install --git https://github.com/ph0ryn/silentmouse.git
 pnpm add @ph0ryn/micro
 ```
 
@@ -38,21 +40,21 @@ await chrome.click(point(100, 200));
 await chrome.click();
 await chrome.fclick(point(100, 200), 10);
 
-await chrome.mouseDown();
+await chrome.mouseDown(point(100, 200));
 await chrome.move(point(500, 600), 800);
 await chrome.mouseUp();
 
-const cursor = await chrome.cursor();
+const cursor = chrome.cursor;
 const size = chrome.size;
 ```
 
 Move durations are in milliseconds. `click()` uses the current cursor position
-when called without a target, and `mouseDown()` always uses the current cursor
-position. `fclick()` uses the final argument as a pixel radius and clamps the
-generated point to the window. `cursor()` returns window-relative coordinates
-even when the cursor is currently outside the window. `size` returns the cached
-window width and height. Call `refreshBounds()` after moving or resizing the
-window outside Micro.
+when called without a target. `mouseDown()` and `mouseUp()` use an explicit
+target when provided, otherwise they use Micro's tracked cursor position.
+`fclick()` uses the final argument as a pixel radius and clamps the generated
+point to the window. `cursor` returns Micro's tracked window-relative cursor
+position. `size` returns the cached window width and height. Call
+`refreshBounds()` after moving or resizing the window outside Micro.
 
 To list bundle IDs for visible applications:
 
@@ -116,8 +118,6 @@ Image search currently does not support multi-scale matching or rotation.
 Templates should be captured at the scale of the display where they are used.
 Windows spanning displays with different scales are not supported.
 
-Use `checkRequirements({ screenRecording: true })` before image search when you
-want to check Screen Recording permission as well as the default macOS and
-Accessibility requirements.
-If a required permission is missing, Micro opens the matching macOS Settings
-pane and throws an error.
+`checkRequirements()` is kept as a compatibility preflight hook. Accessibility
+permission is requested by `silentmouse` on first use, and Screen Recording
+permission errors surface when image capture runs.
