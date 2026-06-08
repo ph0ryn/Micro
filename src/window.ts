@@ -2,8 +2,8 @@ import { sleep } from "./util.ts";
 
 import type { ImageFinder } from "./image-finder.ts";
 import type { Image } from "./image.ts";
-import type { BoundsOptions, FindOptions, Match, MoveOptions, Point, Size } from "./types.ts";
-import type { WindowBounds, WindowBoundsProvider, WindowTarget } from "./window-bounds.ts";
+import type { FrameOptions, FindOptions, Match, MoveOptions, Point, Size } from "./types.ts";
+import type { WindowFrame, WindowFrameProvider, WindowTarget } from "./window-frame.ts";
 
 export interface Automation {
   click(windowId: number, target: Point): Promise<void>;
@@ -22,9 +22,9 @@ export interface AutomationMoveRequest {
 
 export interface WindowDependencies {
   automation: Automation;
-  bounds: WindowBounds;
-  boundsProvider: WindowBoundsProvider;
-  cacheBounds?: boolean;
+  frame: WindowFrame;
+  frameProvider: WindowFrameProvider;
+  cacheFrame?: boolean;
   imageFinder?: ImageFinder;
   random?: () => number;
 }
@@ -36,7 +36,7 @@ interface ResolvedFindOptions {
 }
 
 interface InternalMoveOptions {
-  bounds?: WindowBounds;
+  frame?: WindowFrame;
   safeWait?: boolean;
 }
 
@@ -52,22 +52,22 @@ const assertConfidence = (confidence: number): void => {
   }
 };
 
-const assertPointInWindow = (target: Point, bounds: WindowBounds): void => {
+const assertPointInWindow = (target: Point, frame: WindowFrame): void => {
   if (
     !Number.isFinite(target.x) ||
     !Number.isFinite(target.y) ||
     target.x < 0 ||
     target.y < 0 ||
-    target.x >= bounds.size.width ||
-    target.y >= bounds.size.height
+    target.x >= frame.size.width ||
+    target.y >= frame.size.height
   ) {
     throw new Error(`Point (${target.x}, ${target.y}) is outside the window`);
   }
 };
 
-const assertRefreshBoundsOption = (options: BoundsOptions): void => {
-  if (options.refreshBounds !== undefined && typeof options.refreshBounds !== "boolean") {
-    throw new Error("refreshBounds must be a boolean");
+const assertRefreshFrameOption = (options: FrameOptions): void => {
+  if (options.refreshFrame !== undefined && typeof options.refreshFrame !== "boolean") {
+    throw new Error("refreshFrame must be a boolean");
   }
 };
 
@@ -78,7 +78,7 @@ const toFindOptions = (input: unknown): FindOptions => {
 
   const options = input as FindOptions;
 
-  assertRefreshBoundsOption(options);
+  assertRefreshFrameOption(options);
 
   return options;
 };
@@ -92,16 +92,16 @@ const toMoveOptions = (input: boolean | MoveOptions | undefined): MoveOptions =>
 
   const options = input ?? {};
 
-  assertRefreshBoundsOption(options);
+  assertRefreshFrameOption(options);
 
   return options;
 };
 
-const resolveFindOptions = (options: FindOptions, bounds: WindowBounds): ResolvedFindOptions => ({
+const resolveFindOptions = (options: FindOptions, frame: WindowFrame): ResolvedFindOptions => ({
   confidence: options.confidence ?? 0.99,
   end: options.end ?? {
-    x: bounds.size.width,
-    y: bounds.size.height,
+    x: frame.size.width,
+    y: frame.size.height,
   },
   start: options.start ?? {
     x: 0,
@@ -109,7 +109,7 @@ const resolveFindOptions = (options: FindOptions, bounds: WindowBounds): Resolve
   },
 });
 
-const assertFindOptions = (options: ResolvedFindOptions, bounds: WindowBounds): void => {
+const assertFindOptions = (options: ResolvedFindOptions, frame: WindowFrame): void => {
   if (
     !Number.isFinite(options.start.x) ||
     !Number.isFinite(options.start.y) ||
@@ -117,8 +117,8 @@ const assertFindOptions = (options: ResolvedFindOptions, bounds: WindowBounds): 
     !Number.isFinite(options.end.y) ||
     options.start.x < 0 ||
     options.start.y < 0 ||
-    options.end.x > bounds.size.width ||
-    options.end.y > bounds.size.height ||
+    options.end.x > frame.size.width ||
+    options.end.y > frame.size.height ||
     options.end.x <= options.start.x ||
     options.end.y <= options.start.y
   ) {
@@ -126,10 +126,10 @@ const assertFindOptions = (options: ResolvedFindOptions, bounds: WindowBounds): 
   }
 };
 
-const toFindBounds = (bounds: WindowBounds, options: ResolvedFindOptions): WindowBounds => ({
+const toFindFrame = (frame: WindowFrame, options: ResolvedFindOptions): WindowFrame => ({
   origin: {
-    x: bounds.origin.x + options.start.x,
-    y: bounds.origin.y + options.start.y,
+    x: frame.origin.x + options.start.x,
+    y: frame.origin.y + options.start.y,
   },
   size: {
     height: options.end.y - options.start.y,
@@ -167,20 +167,20 @@ const runWindowOperation = async <Result>(operation: () => Promise<Result>): Pro
 export class Window {
   private readonly target: WindowTarget;
   private readonly automation: Automation;
-  private readonly boundsProvider: WindowBoundsProvider;
-  private readonly cacheBounds: boolean;
+  private readonly frameProvider: WindowFrameProvider;
+  private readonly cacheFrame: boolean;
   private readonly imageFinder?: ImageFinder;
   private readonly random: () => number;
-  private bounds: WindowBounds;
+  private frame: WindowFrame;
   private currentCursor: Point | null = null;
   private mousePressed = false;
 
   constructor(target: WindowTarget, dependencies: WindowDependencies) {
     this.target = target;
     this.automation = dependencies.automation;
-    this.bounds = dependencies.bounds;
-    this.boundsProvider = dependencies.boundsProvider;
-    this.cacheBounds = dependencies.cacheBounds ?? false;
+    this.frame = dependencies.frame;
+    this.frameProvider = dependencies.frameProvider;
+    this.cacheFrame = dependencies.cacheFrame ?? false;
     this.imageFinder = dependencies.imageFinder;
     this.random = dependencies.random ?? Math.random;
   }
@@ -192,10 +192,10 @@ export class Window {
   ): Promise<void> {
     await runWindowOperation(async () => {
       const moveOptions = toMoveOptions(options);
-      const bounds = await this.getOperationBounds(moveOptions, false);
+      const frame = await this.getOperationFrame(moveOptions, false);
 
       await this.moveInternal(target, durationMs, {
-        bounds,
+        frame,
         safeWait: moveOptions.safeWait,
       });
     });
@@ -203,84 +203,84 @@ export class Window {
 
   async focus(): Promise<void> {
     await runWindowOperation(async () => {
-      this.bounds = await this.boundsProvider.focusAndGet(this.target);
+      this.frame = await this.frameProvider.focusAndGet(this.target);
     });
   }
 
-  async refreshBounds(): Promise<WindowBounds> {
-    return runWindowOperation(() => this.refreshBoundsInternal());
+  async refreshFrame(): Promise<WindowFrame> {
+    return runWindowOperation(() => this.refreshFrameInternal());
   }
 
-  async click(target?: Point, options: BoundsOptions = {}): Promise<void> {
+  async click(target?: Point, options: FrameOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
-      let bounds = this.bounds;
+      let frame = this.frame;
 
       if (target) {
-        assertRefreshBoundsOption(options);
-        bounds = await this.getOperationBounds(options, true);
+        assertRefreshFrameOption(options);
+        frame = await this.getOperationFrame(options, true);
 
-        await this.moveInternal(target, 0, { bounds });
+        await this.moveInternal(target, 0, { frame });
       }
 
-      await this.automation.click(this.requireWindowId(bounds), this.requireCursor());
+      await this.automation.click(this.requireWindowId(frame), this.requireCursor());
     });
   }
 
-  async fclick(target: Point, fuzzy: number, options: BoundsOptions = {}): Promise<void> {
+  async fclick(target: Point, fuzzy: number, options: FrameOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
       if (!Number.isFinite(fuzzy) || fuzzy < 0) {
         throw new Error("fuzzy must be a non-negative finite number");
       }
 
-      assertRefreshBoundsOption(options);
-      const bounds = await this.getOperationBounds(options, true);
+      assertRefreshFrameOption(options);
+      const frame = await this.getOperationFrame(options, true);
 
-      assertPointInWindow(target, bounds);
+      assertPointInWindow(target, frame);
 
       const fuzzed = {
         x: Math.min(
           Math.max(0, target.x + Math.round((this.random() * 2 - 1) * fuzzy)),
-          bounds.size.width - 1,
+          frame.size.width - 1,
         ),
         y: Math.min(
           Math.max(0, target.y + Math.round((this.random() * 2 - 1) * fuzzy)),
-          bounds.size.height - 1,
+          frame.size.height - 1,
         ),
       };
 
-      await this.moveInternal(fuzzed, 0, { bounds });
-      await this.automation.click(this.requireWindowId(bounds), this.requireCursor());
+      await this.moveInternal(fuzzed, 0, { frame });
+      await this.automation.click(this.requireWindowId(frame), this.requireCursor());
     });
   }
 
-  async mouseDown(target?: Point, options: BoundsOptions = {}): Promise<void> {
+  async mouseDown(target?: Point, options: FrameOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
-      let bounds = this.bounds;
+      let frame = this.frame;
 
       if (target) {
-        assertRefreshBoundsOption(options);
-        bounds = await this.getOperationBounds(options, true);
+        assertRefreshFrameOption(options);
+        frame = await this.getOperationFrame(options, true);
 
-        await this.moveInternal(target, 0, { bounds, safeWait: false });
+        await this.moveInternal(target, 0, { frame, safeWait: false });
       }
 
-      await this.automation.mouseDown(this.requireWindowId(bounds), this.requireCursor());
+      await this.automation.mouseDown(this.requireWindowId(frame), this.requireCursor());
       this.mousePressed = true;
     });
   }
 
-  async mouseUp(target?: Point, options: BoundsOptions = {}): Promise<void> {
+  async mouseUp(target?: Point, options: FrameOptions = {}): Promise<void> {
     await runWindowOperation(async () => {
-      let bounds = this.bounds;
+      let frame = this.frame;
 
       if (target) {
-        assertRefreshBoundsOption(options);
-        bounds = await this.getOperationBounds(options, true);
+        assertRefreshFrameOption(options);
+        frame = await this.getOperationFrame(options, true);
 
-        await this.moveInternal(target, 0, { bounds, safeWait: false });
+        await this.moveInternal(target, 0, { frame, safeWait: false });
       }
 
-      await this.automation.mouseUp(this.requireWindowId(bounds), this.requireCursor());
+      await this.automation.mouseUp(this.requireWindowId(frame), this.requireCursor());
       this.mousePressed = false;
     });
   }
@@ -292,19 +292,19 @@ export class Window {
   }
 
   get size(): Size {
-    return this.bounds.size;
+    return this.frame.size;
   }
 
   async find(image: Image, options: FindOptions = {}): Promise<Match | null> {
     const imageFinder = this.getImageFinder();
     const findOptions = toFindOptions(options);
-    const bounds = await this.getOperationBounds(findOptions, true);
-    const resolvedOptions = resolveFindOptions(findOptions, bounds);
+    const frame = await this.getOperationFrame(findOptions, true);
+    const resolvedOptions = resolveFindOptions(findOptions, frame);
 
     assertConfidence(resolvedOptions.confidence);
-    assertFindOptions(resolvedOptions, bounds);
-    const searchBounds = toFindBounds(bounds, resolvedOptions);
-    const match = await imageFinder.find(image, searchBounds, resolvedOptions.confidence);
+    assertFindOptions(resolvedOptions, frame);
+    const searchFrame = toFindFrame(frame, resolvedOptions);
+    const match = await imageFinder.find(image, searchFrame, resolvedOptions.confidence);
 
     if (!match) {
       return null;
@@ -316,13 +316,13 @@ export class Window {
   async findAll(image: Image, options: FindOptions = {}): Promise<Match[]> {
     const imageFinder = this.getImageFinder();
     const findOptions = toFindOptions(options);
-    const bounds = await this.getOperationBounds(findOptions, true);
-    const resolvedOptions = resolveFindOptions(findOptions, bounds);
+    const frame = await this.getOperationFrame(findOptions, true);
+    const resolvedOptions = resolveFindOptions(findOptions, frame);
 
     assertConfidence(resolvedOptions.confidence);
-    assertFindOptions(resolvedOptions, bounds);
-    const searchBounds = toFindBounds(bounds, resolvedOptions);
-    const matches = await imageFinder.findAll(image, searchBounds, resolvedOptions.confidence);
+    assertFindOptions(resolvedOptions, frame);
+    const searchFrame = toFindFrame(frame, resolvedOptions);
+    const matches = await imageFinder.findAll(image, searchFrame, resolvedOptions.confidence);
 
     return matches.map((match) => offsetMatch(match, resolvedOptions.start));
   }
@@ -335,29 +335,29 @@ export class Window {
     return this.imageFinder;
   }
 
-  private async getOperationBounds(
-    options: BoundsOptions,
+  private async getOperationFrame(
+    options: FrameOptions,
     defaultRefresh: boolean,
-  ): Promise<WindowBounds> {
-    if (options.refreshBounds ?? (defaultRefresh && !this.cacheBounds)) {
-      return this.refreshBoundsInternal();
+  ): Promise<WindowFrame> {
+    if (options.refreshFrame ?? (defaultRefresh && !this.cacheFrame)) {
+      return this.refreshFrameInternal();
     }
 
-    return this.bounds;
+    return this.frame;
   }
 
-  private async refreshBoundsInternal(): Promise<WindowBounds> {
-    const bounds = await this.boundsProvider.get(this.target);
+  private async refreshFrameInternal(): Promise<WindowFrame> {
+    const frame = await this.frameProvider.get(this.target);
 
-    this.bounds = bounds;
+    this.frame = frame;
 
-    return bounds;
+    return frame;
   }
 
-  private toWindowPoint(target: Point, bounds?: WindowBounds): Point {
-    const resolvedBounds = bounds ?? this.bounds;
+  private toWindowPoint(target: Point, frame?: WindowFrame): Point {
+    const resolvedFrame = frame ?? this.frame;
 
-    assertPointInWindow(target, resolvedBounds);
+    assertPointInWindow(target, resolvedFrame);
 
     return { ...target };
   }
@@ -370,12 +370,12 @@ export class Window {
     return this.currentCursor;
   }
 
-  private requireWindowId(bounds: WindowBounds): number {
-    if (bounds.windowId === undefined) {
+  private requireWindowId(frame: WindowFrame): number {
+    if (frame.windowId === undefined) {
       throw new Error("CGWindowID is not initialized");
     }
 
-    return bounds.windowId;
+    return frame.windowId;
   }
 
   private async moveInternal(
@@ -385,9 +385,9 @@ export class Window {
   ): Promise<void> {
     assertDuration(durationMs);
 
-    const { bounds, safeWait = true } = options;
-    const resolvedBounds = bounds ?? this.bounds;
-    const windowPoint = this.toWindowPoint(target, resolvedBounds);
+    const { frame, safeWait = true } = options;
+    const resolvedFrame = frame ?? this.frame;
+    const windowPoint = this.toWindowPoint(target, resolvedFrame);
     const previousCursor = this.currentCursor ?? undefined;
 
     await this.automation.move({
@@ -395,7 +395,7 @@ export class Window {
       durationMs,
       from: previousCursor,
       target: windowPoint,
-      windowId: this.requireWindowId(resolvedBounds),
+      windowId: this.requireWindowId(resolvedFrame),
     });
 
     this.currentCursor = windowPoint;

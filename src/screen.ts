@@ -1,7 +1,7 @@
 import { Monitor } from "node-screenshots";
 
 import type { Bitmap, ScreenCapture } from "./image-finder.ts";
-import type { WindowBounds } from "./window-bounds.ts";
+import type { WindowFrame } from "./window-frame.ts";
 
 export interface CapturedImage {
   height: number;
@@ -35,9 +35,9 @@ const rgbaToRgb = (image: CapturedImage): Buffer => {
   return rgb;
 };
 
-const cropBounds = (
+const cropFrame = (
   monitor: ScreenMonitor,
-  bounds: WindowBounds,
+  frame: WindowFrame,
 ): {
   height: number;
   width: number;
@@ -47,16 +47,16 @@ const cropBounds = (
   const scale = monitor.scaleFactor();
 
   return {
-    height: Math.round(bounds.size.height * scale),
-    width: Math.round(bounds.size.width * scale),
-    x: Math.round((bounds.origin.x - monitor.x()) * scale),
-    y: Math.round((bounds.origin.y - monitor.y()) * scale),
+    height: Math.round(frame.size.height * scale),
+    width: Math.round(frame.size.width * scale),
+    x: Math.round((frame.origin.x - monitor.x()) * scale),
+    y: Math.round((frame.origin.y - monitor.y()) * scale),
   };
 };
 
-export const createBitmap = (image: CapturedImage, bounds: WindowBounds): Bitmap => {
-  const scaleX = image.width / bounds.size.width;
-  const scaleY = image.height / bounds.size.height;
+export const createBitmap = (image: CapturedImage, frame: WindowFrame): Bitmap => {
+  const scaleX = image.width / frame.size.width;
+  const scaleY = image.height / frame.size.height;
 
   return {
     height: image.height,
@@ -69,7 +69,7 @@ export const createBitmap = (image: CapturedImage, bounds: WindowBounds): Bitmap
 
 const assertCapturedSize = (image: CapturedImage, width: number, height: number): void => {
   if (image.width !== width || image.height !== height) {
-    throw new Error("Capture bounds must be inside a single monitor");
+    throw new Error("Capture frame must be inside a single monitor");
   }
 };
 
@@ -80,24 +80,24 @@ const defaultDependencies: MacScreenCaptureDependencies = {
 export const createMacScreenCapture = (
   dependencies: MacScreenCaptureDependencies = defaultDependencies,
 ): ScreenCapture => ({
-  async grab(bounds): Promise<Bitmap> {
+  async grab(frame): Promise<Bitmap> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
-    const monitor = dependencies.findMonitor(bounds.origin.x, bounds.origin.y);
+    const monitor = dependencies.findMonitor(frame.origin.x, frame.origin.y);
 
     if (!monitor) {
-      throw new Error("Capture bounds must start inside a monitor");
+      throw new Error("Capture frame must start inside a monitor");
     }
 
     const source = monitor.captureImageSync();
-    const crop = cropBounds(monitor, bounds);
+    const crop = cropFrame(monitor, frame);
     const image = source.cropSync(crop.x, crop.y, crop.width, crop.height);
 
     assertCapturedSize(image, crop.width, crop.height);
 
-    return createBitmap(image, bounds);
+    return createBitmap(image, frame);
   },
 });
 

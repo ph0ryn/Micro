@@ -3,10 +3,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import {
-  createMacWindowBoundsProvider,
+  createMacWindowFrameProvider,
   findTargetScript,
   type WindowTarget,
-} from "./window-bounds.ts";
+} from "./window-frame.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -144,9 +144,9 @@ describe("findTargetScript", () => {
   });
 });
 
-describe("createMacWindowBoundsProvider", () => {
+describe("createMacWindowFrameProvider", () => {
   test("resolves a CGWindowID from matching window geometry", async () => {
-    const provider = createMacWindowBoundsProvider({
+    const provider = createMacWindowFrameProvider({
       listWindows: () => [
         {
           height: 600,
@@ -167,7 +167,7 @@ describe("createMacWindowBoundsProvider", () => {
           z: 0,
         },
       ],
-      async runBoundsScript() {
+      async runFrameScript() {
         return {
           origin: {
             x: 300,
@@ -196,9 +196,9 @@ describe("createMacWindowBoundsProvider", () => {
   });
 
   test("throws when the CGWindowID cannot be resolved", async () => {
-    const provider = createMacWindowBoundsProvider({
+    const provider = createMacWindowFrameProvider({
       listWindows: () => [],
-      async runBoundsScript() {
+      async runFrameScript() {
         return {
           origin: {
             x: 300,

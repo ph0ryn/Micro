@@ -22,7 +22,7 @@
     "lint": "oxlint --type-aware --type-check",
     "prepack": "clean-pkg-json -r devDependencies",
     "precommit": "pnpm run format",
-    "test": "bun test src/window-bounds.test.ts src/util.test.ts src/opencv.test.ts src/requirements.test.ts && bun test src/screen.test.ts src/image.test.ts src/image-finder.test.ts && bun test src/window.test.ts"
+    "test": "bun test src/window-frame.test.ts src/util.test.ts src/requirements.test.ts && bun test src/opencv.test.ts && bun test src/screen.test.ts src/image.test.ts src/image-finder.test.ts && bun test src/window.test.ts"
   },
   "lint-staged": {
     "src/**/*.ts": [

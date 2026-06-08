@@ -3,9 +3,9 @@ import { describe, expect, test } from "bun:test";
 import { createImageFinder } from "./image-finder.ts";
 
 import type { Image } from "./image.ts";
-import type { WindowBounds } from "./window-bounds.ts";
+import type { WindowFrame } from "./window-frame.ts";
 
-const bounds: WindowBounds = {
+const frame: WindowFrame = {
   origin: {
     x: 100,
     y: 200,
@@ -23,8 +23,8 @@ describe("createImageFinder", () => {
     const calls: unknown[][] = [];
     const finder = createImageFinder(
       {
-        async grab(captureBounds) {
-          calls.push(["grab", captureBounds]);
+        async grab(captureFrame) {
+          calls.push(["grab", captureFrame]);
 
           return {
             height: 100,
@@ -63,7 +63,7 @@ describe("createImageFinder", () => {
       },
     );
 
-    expect(await finder.find(image, bounds, 0.99)).toEqual({
+    expect(await finder.find(image, frame, 0.99)).toEqual({
       center: {
         x: 7.75,
         y: 6.25,
@@ -80,7 +80,7 @@ describe("createImageFinder", () => {
     });
 
     expect(calls).toEqual([
-      ["grab", bounds],
+      ["grab", frame],
       ["find", 160, image, 0.99],
     ]);
   });
@@ -108,7 +108,7 @@ describe("createImageFinder", () => {
       },
     );
 
-    expect(await finder.find(image, bounds, 0.99)).toBeNull();
-    expect(await finder.findAll(image, bounds, 0.99)).toEqual([]);
+    expect(await finder.find(image, frame, 0.99)).toBeNull();
+    expect(await finder.findAll(image, frame, 0.99)).toEqual([]);
   });
 });

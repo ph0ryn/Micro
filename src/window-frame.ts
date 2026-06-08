@@ -55,7 +55,7 @@ function findTarget(target) {
 }
 `;
 
-const windowBoundsScript = String.raw`
+const windowFrameScript = String.raw`
 ${findTargetScript}
 
 function run(argv) {
@@ -71,7 +71,7 @@ function run(argv) {
 }
 `;
 
-const focusAndGetWindowBoundsScript = String.raw`
+const focusAndGetWindowFrameScript = String.raw`
 ${findTargetScript}
 
 function run(argv) {
@@ -92,15 +92,15 @@ function run(argv) {
 
 export type WindowTarget = { bundleId: string; name?: never } | { bundleId?: never; name: string };
 
-export interface WindowBounds {
+export interface WindowFrame {
   origin: Point;
   size: Size;
   windowId?: number;
 }
 
-export interface WindowBoundsProvider {
-  focusAndGet(target: WindowTarget): Promise<WindowBounds>;
-  get(target: WindowTarget): Promise<WindowBounds>;
+export interface WindowFrameProvider {
+  focusAndGet(target: WindowTarget): Promise<WindowFrame>;
+  get(target: WindowTarget): Promise<WindowFrame>;
 }
 
 export interface WindowDescription {
@@ -113,22 +113,22 @@ export interface WindowDescription {
   z: number;
 }
 
-interface TargetWindowBounds {
+interface TargetWindowFrame {
   origin: Point;
   pid: number;
   size: Size;
 }
 
-export interface MacWindowBoundsProviderDependencies {
+export interface MacWindowFrameProviderDependencies {
   listWindows(): WindowDescription[];
-  runBoundsScript(script: string, target: WindowTarget): Promise<TargetWindowBounds>;
+  runFrameScript(script: string, target: WindowTarget): Promise<TargetWindowFrame>;
 }
 
 const serializeWindowTarget = (target: WindowTarget): string => JSON.stringify(target);
 
 const closeEnough = (left: number, right: number): boolean => Math.abs(left - right) <= 1;
 
-const resolveWindowId = (target: TargetWindowBounds, windows: WindowDescription[]): number => {
+const resolveWindowId = (target: TargetWindowFrame, windows: WindowDescription[]): number => {
   const candidates = windows
     .filter(
       (window) =>
@@ -149,16 +149,13 @@ const resolveWindowId = (target: TargetWindowBounds, windows: WindowDescription[
   return candidate.id;
 };
 
-const withWindowId = (target: TargetWindowBounds, windows: WindowDescription[]): WindowBounds => ({
+const withWindowId = (target: TargetWindowFrame, windows: WindowDescription[]): WindowFrame => ({
   origin: target.origin,
   size: target.size,
   windowId: resolveWindowId(target, windows),
 });
 
-const runBoundsScript = async (
-  script: string,
-  target: WindowTarget,
-): Promise<TargetWindowBounds> => {
+const runFrameScript = async (script: string, target: WindowTarget): Promise<TargetWindowFrame> => {
   const { stdout } = await execFileAsync("osascript", [
     "-l",
     "JavaScript",
@@ -168,10 +165,10 @@ const runBoundsScript = async (
     serializeWindowTarget(target),
   ]);
 
-  return JSON.parse(stdout) as TargetWindowBounds;
+  return JSON.parse(stdout) as TargetWindowFrame;
 };
 
-const defaultDependencies: MacWindowBoundsProviderDependencies = {
+const defaultDependencies: MacWindowFrameProviderDependencies = {
   listWindows: () =>
     ScreenshotWindow.all().map((window) => ({
       height: window.height(),
@@ -182,33 +179,33 @@ const defaultDependencies: MacWindowBoundsProviderDependencies = {
       y: window.y(),
       z: window.z(),
     })),
-  runBoundsScript,
+  runFrameScript,
 };
 
-export const createMacWindowBoundsProvider = (
-  dependencies: MacWindowBoundsProviderDependencies = defaultDependencies,
-): WindowBoundsProvider => ({
-  async focusAndGet(target: WindowTarget): Promise<WindowBounds> {
+export const createMacWindowFrameProvider = (
+  dependencies: MacWindowFrameProviderDependencies = defaultDependencies,
+): WindowFrameProvider => ({
+  async focusAndGet(target: WindowTarget): Promise<WindowFrame> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
     return withWindowId(
-      await dependencies.runBoundsScript(focusAndGetWindowBoundsScript, target),
+      await dependencies.runFrameScript(focusAndGetWindowFrameScript, target),
       dependencies.listWindows(),
     );
   },
 
-  async get(target: WindowTarget): Promise<WindowBounds> {
+  async get(target: WindowTarget): Promise<WindowFrame> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
     return withWindowId(
-      await dependencies.runBoundsScript(windowBoundsScript, target),
+      await dependencies.runFrameScript(windowFrameScript, target),
       dependencies.listWindows(),
     );
   },
 });
 
-export const macWindowBoundsProvider = createMacWindowBoundsProvider();
+export const macWindowFrameProvider = createMacWindowFrameProvider();

@@ -15,17 +15,17 @@ export interface Match {
   size: Size;
 }
 
-export interface BoundsOptions {
-  refreshBounds?: boolean;
+export interface FrameOptions {
+  refreshFrame?: boolean;
 }
 
-export interface FindOptions extends BoundsOptions {
+export interface FindOptions extends FrameOptions {
   confidence?: number;
   end?: Point;
   start?: Point;
 }
 
-export interface MoveOptions extends BoundsOptions {
+export interface MoveOptions extends FrameOptions {
   safeWait?: boolean;
 }
 

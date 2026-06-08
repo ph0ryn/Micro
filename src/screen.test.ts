@@ -187,7 +187,7 @@ describe("createMacScreenCapture", () => {
           width: 2,
         },
       }),
-    ).rejects.toThrow("Capture bounds must be inside a single monitor");
+    ).rejects.toThrow("Capture frame must be inside a single monitor");
   });
 
   test("rejects captures that start outside all monitors", async () => {
@@ -204,6 +204,6 @@ describe("createMacScreenCapture", () => {
           width: 1,
         },
       }),
-    ).rejects.toThrow("Capture bounds must start inside a monitor");
+    ).rejects.toThrow("Capture frame must start inside a monitor");
   });
 });

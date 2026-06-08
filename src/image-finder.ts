@@ -1,6 +1,6 @@
 import type { Image } from "./image.ts";
 import type { Match } from "./types.ts";
-import type { WindowBounds } from "./window-bounds.ts";
+import type { WindowFrame } from "./window-frame.ts";
 
 export interface Bitmap {
   height: number;
@@ -19,7 +19,7 @@ export interface PixelMatch {
 }
 
 export interface ScreenCapture {
-  grab(bounds: WindowBounds): Promise<Bitmap>;
+  grab(frame: WindowFrame): Promise<Bitmap>;
 }
 
 export interface TemplateMatcher {
@@ -28,8 +28,8 @@ export interface TemplateMatcher {
 }
 
 export interface ImageFinder {
-  find(image: Image, bounds: WindowBounds, confidence: number): Promise<Match | null>;
-  findAll(image: Image, bounds: WindowBounds, confidence: number): Promise<Match[]>;
+  find(image: Image, frame: WindowFrame, confidence: number): Promise<Match | null>;
+  findAll(image: Image, frame: WindowFrame, confidence: number): Promise<Match[]>;
 }
 
 const toLogicalMatch = (match: PixelMatch, bitmap: Bitmap): Match => {
@@ -57,8 +57,8 @@ export const createImageFinder = (
   screenCapture: ScreenCapture,
   templateMatcher: TemplateMatcher,
 ): ImageFinder => ({
-  async find(image, bounds, confidence): Promise<Match | null> {
-    const bitmap = await screenCapture.grab(bounds);
+  async find(image, frame, confidence): Promise<Match | null> {
+    const bitmap = await screenCapture.grab(frame);
     const match = await templateMatcher.find(bitmap, image, confidence);
 
     if (!match) {
@@ -68,8 +68,8 @@ export const createImageFinder = (
     return toLogicalMatch(match, bitmap);
   },
 
-  async findAll(image, bounds, confidence): Promise<Match[]> {
-    const bitmap = await screenCapture.grab(bounds);
+  async findAll(image, frame, confidence): Promise<Match[]> {
+    const bitmap = await screenCapture.grab(frame);
     const matches = await templateMatcher.findAll(bitmap, image, confidence);
 
     return matches.map((match) => toLogicalMatch(match, bitmap));
