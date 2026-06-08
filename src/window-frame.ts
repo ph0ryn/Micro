@@ -113,6 +113,16 @@ export interface WindowDescription {
   z: number;
 }
 
+export interface ScreenshotWindowLike {
+  height(): number;
+  id(): number;
+  pid(): number;
+  width(): number;
+  x(): number;
+  y(): number;
+  z(): number;
+}
+
 interface TargetWindowFrame {
   origin: Point;
   pid: number;
@@ -168,9 +178,11 @@ const runFrameScript = async (script: string, target: WindowTarget): Promise<Tar
   return JSON.parse(stdout) as TargetWindowFrame;
 };
 
-const defaultDependencies: MacWindowFrameProviderDependencies = {
-  listWindows: () =>
-    ScreenshotWindow.all().map((window) => ({
+export const describeScreenshotWindow = (
+  window: ScreenshotWindowLike,
+): WindowDescription | null => {
+  try {
+    return {
       height: window.height(),
       id: window.id(),
       pid: window.pid(),
@@ -178,7 +190,23 @@ const defaultDependencies: MacWindowFrameProviderDependencies = {
       x: window.x(),
       y: window.y(),
       z: window.z(),
-    })),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const defaultDependencies: MacWindowFrameProviderDependencies = {
+  listWindows: () =>
+    ScreenshotWindow.all().flatMap((window) => {
+      const description = describeScreenshotWindow(window);
+
+      if (!description) {
+        return [];
+      }
+
+      return [description];
+    }),
   runFrameScript,
 };
 

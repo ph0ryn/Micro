@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 
 import {
   createMacWindowFrameProvider,
+  describeScreenshotWindow,
   findTargetScript,
   type WindowTarget,
 } from "./window-frame.ts";
@@ -216,5 +217,23 @@ describe("createMacWindowFrameProvider", () => {
     expect(provider.get({ bundleId: "com.google.Chrome" })).rejects.toThrow(
       "CGWindowID not found for pid 34",
     );
+  });
+});
+
+describe("describeScreenshotWindow", () => {
+  test("returns null for stale windows whose properties fail", () => {
+    expect(
+      describeScreenshotWindow({
+        height() {
+          throw new Error("Window not found");
+        },
+        id: () => 123,
+        pid: () => 34,
+        width: () => 800,
+        x: () => 100,
+        y: () => 200,
+        z: () => 0,
+      }),
+    ).toBeNull();
   });
 });
