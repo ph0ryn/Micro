@@ -23,8 +23,8 @@ describe("createImageFinder", () => {
     const calls: unknown[][] = [];
     const finder = createImageFinder(
       {
-        async grab(captureFrame) {
-          calls.push(["grab", captureFrame]);
+        async grab(captureFrame, region) {
+          calls.push(["grab", captureFrame, region]);
 
           return {
             height: 100,
@@ -63,7 +63,18 @@ describe("createImageFinder", () => {
       },
     );
 
-    expect(await finder.find(image, frame, 0.99)).toEqual({
+    const region = {
+      origin: {
+        x: 10,
+        y: 20,
+      },
+      size: {
+        height: 30,
+        width: 40,
+      },
+    };
+
+    expect(await finder.find({ confidence: 0.99, frame, image, region })).toEqual({
       center: {
         x: 7.75,
         y: 6.25,
@@ -80,7 +91,7 @@ describe("createImageFinder", () => {
     });
 
     expect(calls).toEqual([
-      ["grab", frame],
+      ["grab", frame, region],
       ["find", 160, image, 0.99],
     ]);
   });
@@ -108,7 +119,15 @@ describe("createImageFinder", () => {
       },
     );
 
-    expect(await finder.find(image, frame, 0.99)).toBeNull();
-    expect(await finder.findAll(image, frame, 0.99)).toEqual([]);
+    const region = {
+      origin: {
+        x: 0,
+        y: 0,
+      },
+      size: frame.size,
+    };
+
+    expect(await finder.find({ confidence: 0.99, frame, image, region })).toBeNull();
+    expect(await finder.findAll({ confidence: 0.99, frame, image, region })).toEqual([]);
   });
 });

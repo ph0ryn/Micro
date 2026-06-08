@@ -97,10 +97,10 @@ const offsetMatch: Match = {
   },
 };
 
-const searchFrame: WindowFrame = {
+const searchRegion = {
   origin: {
-    x: 110,
-    y: 220,
+    x: 10,
+    y: 20,
   },
   size: {
     height: 200,
@@ -111,13 +111,17 @@ const searchFrame: WindowFrame = {
 const createImageFinder = () => {
   const calls: unknown[][] = [];
   const imageFinder: ImageFinder = {
-    async find(needle, searchFrame, confidence) {
-      calls.push(["find", needle, searchFrame, confidence]);
+    async find(request) {
+      const { confidence, frame, image: needle, region } = request;
+
+      calls.push(["find", needle, frame, region, confidence]);
 
       return match;
     },
-    async findAll(needle, searchFrame, confidence) {
-      calls.push(["findAll", needle, searchFrame, confidence]);
+    async findAll(request) {
+      const { confidence, frame, image: needle, region } = request;
+
+      calls.push(["findAll", needle, frame, region, confidence]);
 
       return [match];
     },
@@ -627,7 +631,7 @@ describe("Window", () => {
     });
 
     expect(await window.find(image, findOptions)).toEqual(offsetMatch);
-    expect(calls).toEqual([["find", image, searchFrame, 0.99]]);
+    expect(calls).toEqual([["find", image, frame, searchRegion, 0.99]]);
   });
 
   test("defaults missing find range endpoints to the window edges", async () => {
@@ -652,10 +656,11 @@ describe("Window", () => {
       [
         "find",
         image,
+        frame,
         {
           origin: {
-            x: 100,
-            y: 200,
+            x: 0,
+            y: 0,
           },
           size: {
             height: 220,
@@ -667,10 +672,11 @@ describe("Window", () => {
       [
         "findAll",
         image,
+        frame,
         {
           origin: {
-            x: 110,
-            y: 220,
+            x: 10,
+            y: 20,
           },
           size: {
             height: 580,
@@ -682,10 +688,11 @@ describe("Window", () => {
       [
         "find",
         image,
+        frame,
         {
           origin: {
-            x: 100,
-            y: 200,
+            x: 0,
+            y: 0,
           },
           size: {
             height: 600,
@@ -731,10 +738,11 @@ describe("Window", () => {
       [
         "find",
         image,
+        refreshedFrame,
         {
           origin: {
-            x: 310,
-            y: 420,
+            x: 10,
+            y: 20,
           },
           size: {
             height: 200,
@@ -779,7 +787,7 @@ describe("Window", () => {
 
     expect(await window.find(image, findOptions)).toEqual(offsetMatch);
     expect(getCalls).toBe(0);
-    expect(calls).toEqual([["find", image, searchFrame, 0.99]]);
+    expect(calls).toEqual([["find", image, frame, searchRegion, 0.99]]);
   });
 
   test("can refresh frame for one search when cached frame are configured", async () => {
@@ -817,10 +825,11 @@ describe("Window", () => {
       [
         "find",
         image,
+        refreshedFrame,
         {
           origin: {
-            x: 310,
-            y: 420,
+            x: 10,
+            y: 20,
           },
           size: {
             height: 200,
@@ -864,15 +873,17 @@ describe("Window", () => {
 
     expect(await window.find(image, { ...findOptions, refreshFrame: false })).toEqual(offsetMatch);
     expect(getCalls).toBe(0);
-    expect(calls).toEqual([["find", image, searchFrame, 0.99]]);
+    expect(calls).toEqual([["find", image, frame, searchRegion, 0.99]]);
   });
 
   test("returns null for a missing image", async () => {
     const { automation } = createAutomation();
     const calls: unknown[][] = [];
     const imageFinder: ImageFinder = {
-      async find(needle, searchFrame, confidence) {
-        calls.push(["find", needle, searchFrame, confidence]);
+      async find(request) {
+        const { confidence, frame, image: needle, region } = request;
+
+        calls.push(["find", needle, frame, region, confidence]);
 
         return null;
       },
@@ -888,7 +899,7 @@ describe("Window", () => {
     });
 
     expect(await window.find(image, findOptions)).toBeNull();
-    expect(calls).toEqual([["find", image, searchFrame, 0.99]]);
+    expect(calls).toEqual([["find", image, frame, searchRegion, 0.99]]);
   });
 
   test("finds all images with an explicit confidence", async () => {
@@ -902,7 +913,7 @@ describe("Window", () => {
     });
 
     expect(await window.findAll(image, { ...findOptions, confidence: 0.9 })).toEqual([offsetMatch]);
-    expect(calls).toEqual([["findAll", image, searchFrame, 0.9]]);
+    expect(calls).toEqual([["findAll", image, frame, searchRegion, 0.9]]);
   });
 
   test("rejects invalid confidence", () => {

@@ -1,6 +1,6 @@
-import { Monitor } from "node-screenshots";
+import { Window as ScreenshotWindow } from "node-screenshots";
 
-import type { Bitmap, ScreenCapture } from "./image-finder.ts";
+import type { Bitmap, CaptureRegion, ScreenCapture } from "./image-finder.ts";
 import type { WindowFrame } from "./window-frame.ts";
 
 export interface CapturedImage {
@@ -10,15 +10,13 @@ export interface CapturedImage {
   toRawSync(copyOutputData?: boolean | null): Buffer;
 }
 
-export interface ScreenMonitor {
+export interface CaptureWindow {
   captureImageSync(): CapturedImage;
-  scaleFactor(): number;
-  x(): number;
-  y(): number;
+  id(): number;
 }
 
 export interface MacScreenCaptureDependencies {
-  findMonitor(x: number, y: number): ScreenMonitor | null;
+  listWindows(): CaptureWindow[];
 }
 
 const rgbaToRgb = (image: CapturedImage): Buffer => {
@@ -35,69 +33,61 @@ const rgbaToRgb = (image: CapturedImage): Buffer => {
   return rgb;
 };
 
-const cropFrame = (
-  monitor: ScreenMonitor,
-  frame: WindowFrame,
-): {
-  height: number;
-  width: number;
-  x: number;
-  y: number;
-} => {
-  const scale = monitor.scaleFactor();
+const requireWindowId = (frame: WindowFrame): number => {
+  if (frame.windowId === undefined) {
+    throw new Error("CGWindowID is not initialized");
+  }
 
-  return {
-    height: Math.round(frame.size.height * scale),
-    width: Math.round(frame.size.width * scale),
-    x: Math.round((frame.origin.x - monitor.x()) * scale),
-    y: Math.round((frame.origin.y - monitor.y()) * scale),
-  };
+  return frame.windowId;
 };
 
-export const createBitmap = (image: CapturedImage, frame: WindowFrame): Bitmap => {
+const cropRegion = (
+  image: CapturedImage,
+  frame: WindowFrame,
+  region: CaptureRegion,
+): CapturedImage => {
   const scaleX = image.width / frame.size.width;
   const scaleY = image.height / frame.size.height;
-
-  return {
-    height: image.height,
-    rgb: rgbaToRgb(image),
-    scaleX,
-    scaleY,
-    width: image.width,
+  const crop = {
+    height: Math.round(region.size.height * scaleY),
+    width: Math.round(region.size.width * scaleX),
+    x: Math.round(region.origin.x * scaleX),
+    y: Math.round(region.origin.y * scaleY),
   };
+
+  return image.cropSync(crop.x, crop.y, crop.width, crop.height);
 };
 
-const assertCapturedSize = (image: CapturedImage, width: number, height: number): void => {
-  if (image.width !== width || image.height !== height) {
-    throw new Error("Capture frame must be inside a single monitor");
-  }
-};
+export const createBitmap = (image: CapturedImage, region: CaptureRegion): Bitmap => ({
+  height: image.height,
+  rgb: rgbaToRgb(image),
+  scaleX: image.width / region.size.width,
+  scaleY: image.height / region.size.height,
+  width: image.width,
+});
 
 const defaultDependencies: MacScreenCaptureDependencies = {
-  findMonitor: (x, y) => Monitor.fromPoint(x, y),
+  listWindows: () => ScreenshotWindow.all(),
 };
 
 export const createMacScreenCapture = (
   dependencies: MacScreenCaptureDependencies = defaultDependencies,
 ): ScreenCapture => ({
-  async grab(frame): Promise<Bitmap> {
+  async grab(frame, region): Promise<Bitmap> {
     if (process.platform !== "darwin") {
       throw new Error("Micro only supports macOS");
     }
 
-    const monitor = dependencies.findMonitor(frame.origin.x, frame.origin.y);
+    const windowId = requireWindowId(frame);
+    const window = dependencies.listWindows().find((candidate) => candidate.id() === windowId);
 
-    if (!monitor) {
-      throw new Error("Capture frame must start inside a monitor");
+    if (!window) {
+      throw new Error(`Capture window not found for CGWindowID ${windowId}`);
     }
 
-    const source = monitor.captureImageSync();
-    const crop = cropFrame(monitor, frame);
-    const image = source.cropSync(crop.x, crop.y, crop.width, crop.height);
+    const image = cropRegion(window.captureImageSync(), frame, region);
 
-    assertCapturedSize(image, crop.width, crop.height);
-
-    return createBitmap(image, frame);
+    return createBitmap(image, region);
   },
 });
 

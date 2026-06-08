@@ -1,5 +1,5 @@
 import type { Image } from "./image.ts";
-import type { Match } from "./types.ts";
+import type { Match, Point, Size } from "./types.ts";
 import type { WindowFrame } from "./window-frame.ts";
 
 export interface Bitmap {
@@ -18,8 +18,13 @@ export interface PixelMatch {
   y: number;
 }
 
+export interface CaptureRegion {
+  origin: Point;
+  size: Size;
+}
+
 export interface ScreenCapture {
-  grab(frame: WindowFrame): Promise<Bitmap>;
+  grab(frame: WindowFrame, region: CaptureRegion): Promise<Bitmap>;
 }
 
 export interface TemplateMatcher {
@@ -28,8 +33,15 @@ export interface TemplateMatcher {
 }
 
 export interface ImageFinder {
-  find(image: Image, frame: WindowFrame, confidence: number): Promise<Match | null>;
-  findAll(image: Image, frame: WindowFrame, confidence: number): Promise<Match[]>;
+  find(request: ImageFindRequest): Promise<Match | null>;
+  findAll(request: ImageFindRequest): Promise<Match[]>;
+}
+
+export interface ImageFindRequest {
+  confidence: number;
+  frame: WindowFrame;
+  image: Image;
+  region: CaptureRegion;
 }
 
 const toLogicalMatch = (match: PixelMatch, bitmap: Bitmap): Match => {
@@ -57,8 +69,9 @@ export const createImageFinder = (
   screenCapture: ScreenCapture,
   templateMatcher: TemplateMatcher,
 ): ImageFinder => ({
-  async find(image, frame, confidence): Promise<Match | null> {
-    const bitmap = await screenCapture.grab(frame);
+  async find(request): Promise<Match | null> {
+    const { confidence, frame, image, region } = request;
+    const bitmap = await screenCapture.grab(frame, region);
     const match = await templateMatcher.find(bitmap, image, confidence);
 
     if (!match) {
@@ -68,8 +81,9 @@ export const createImageFinder = (
     return toLogicalMatch(match, bitmap);
   },
 
-  async findAll(image, frame, confidence): Promise<Match[]> {
-    const bitmap = await screenCapture.grab(frame);
+  async findAll(request): Promise<Match[]> {
+    const { confidence, frame, image, region } = request;
+    const bitmap = await screenCapture.grab(frame, region);
     const matches = await templateMatcher.findAll(bitmap, image, confidence);
 
     return matches.map((match) => toLogicalMatch(match, bitmap));

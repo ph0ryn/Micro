@@ -126,10 +126,15 @@ const assertFindOptions = (options: ResolvedFindOptions, frame: WindowFrame): vo
   }
 };
 
-const toFindFrame = (frame: WindowFrame, options: ResolvedFindOptions): WindowFrame => ({
+const toCaptureRegion = (
+  options: ResolvedFindOptions,
+): {
+  origin: Point;
+  size: Size;
+} => ({
   origin: {
-    x: frame.origin.x + options.start.x,
-    y: frame.origin.y + options.start.y,
+    x: options.start.x,
+    y: options.start.y,
   },
   size: {
     height: options.end.y - options.start.y,
@@ -303,8 +308,13 @@ export class Window {
 
     assertConfidence(resolvedOptions.confidence);
     assertFindOptions(resolvedOptions, frame);
-    const searchFrame = toFindFrame(frame, resolvedOptions);
-    const match = await imageFinder.find(image, searchFrame, resolvedOptions.confidence);
+    const region = toCaptureRegion(resolvedOptions);
+    const match = await imageFinder.find({
+      confidence: resolvedOptions.confidence,
+      frame,
+      image,
+      region,
+    });
 
     if (!match) {
       return null;
@@ -321,8 +331,13 @@ export class Window {
 
     assertConfidence(resolvedOptions.confidence);
     assertFindOptions(resolvedOptions, frame);
-    const searchFrame = toFindFrame(frame, resolvedOptions);
-    const matches = await imageFinder.findAll(image, searchFrame, resolvedOptions.confidence);
+    const region = toCaptureRegion(resolvedOptions);
+    const matches = await imageFinder.findAll({
+      confidence: resolvedOptions.confidence,
+      frame,
+      image,
+      region,
+    });
 
     return matches.map((match) => offsetMatch(match, resolvedOptions.start));
   }

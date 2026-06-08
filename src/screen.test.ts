@@ -4,8 +4,8 @@ import {
   createBitmap,
   createMacScreenCapture,
   type CapturedImage,
+  type CaptureWindow,
   type MacScreenCaptureDependencies,
-  type ScreenMonitor,
 } from "./screen.ts";
 
 class TestImage implements CapturedImage {
@@ -40,22 +40,17 @@ class TestImage implements CapturedImage {
   }
 }
 
-const createMonitor = (
-  image: CapturedImage,
-  options: {
-    scale: number;
-    x: number;
-    y: number;
+const createWindow = (id: number, image: CapturedImage, calls: unknown[][]): CaptureWindow => ({
+  captureImageSync(): CapturedImage {
+    calls.push(["captureWindow", id]);
+
+    return image;
   },
-): ScreenMonitor => ({
-  captureImageSync: () => image,
-  scaleFactor: () => options.scale,
-  x: () => options.x,
-  y: () => options.y,
+  id: () => id,
 });
 
 describe("createBitmap", () => {
-  test("converts RGBA screenshot data to RGB while deriving density", () => {
+  test("converts RGBA screenshot data to RGB while deriving region density", () => {
     expect(
       createBitmap(
         new TestImage(
@@ -65,8 +60,8 @@ describe("createBitmap", () => {
         ),
         {
           origin: {
-            x: 0,
-            y: 0,
+            x: 4,
+            y: 5,
           },
           size: {
             height: 1,
@@ -85,7 +80,7 @@ describe("createBitmap", () => {
 });
 
 describe("createMacScreenCapture", () => {
-  test("captures negative desktop coordinates from the containing monitor", async () => {
+  test("captures the matching window and crops the requested local region", async () => {
     const calls: unknown[][] = [];
     const image = new TestImage(
       4,
@@ -97,28 +92,36 @@ describe("createMacScreenCapture", () => {
       ]),
     );
     const dependencies: MacScreenCaptureDependencies = {
-      findMonitor(x, y): ScreenMonitor {
-        calls.push(["findMonitor", x, y]);
-
-        return createMonitor(image, {
-          scale: 1,
-          x: -10,
-          y: -5,
-        });
-      },
+      listWindows: () => [
+        createWindow(111, new TestImage(1, 1, Buffer.alloc(4)), calls),
+        createWindow(123, image, calls),
+      ],
     };
 
     expect(
-      await createMacScreenCapture(dependencies).grab({
-        origin: {
-          x: -9,
-          y: -4,
+      await createMacScreenCapture(dependencies).grab(
+        {
+          origin: {
+            x: 100,
+            y: 200,
+          },
+          size: {
+            height: 4,
+            width: 4,
+          },
+          windowId: 123,
         },
-        size: {
-          height: 2,
-          width: 2,
+        {
+          origin: {
+            x: 1,
+            y: 1,
+          },
+          size: {
+            height: 2,
+            width: 2,
+          },
         },
-      }),
+      ),
     ).toEqual({
       height: 2,
       rgb: Buffer.from([15, 16, 17, 18, 19, 20, 27, 28, 29, 30, 31, 32]),
@@ -127,10 +130,11 @@ describe("createMacScreenCapture", () => {
       width: 2,
     });
 
-    expect(calls).toEqual([["findMonitor", -9, -4]]);
+    expect(calls).toEqual([["captureWindow", 123]]);
   });
 
-  test("applies monitor scale before cropping", async () => {
+  test("applies window capture scale before cropping", async () => {
+    const calls: unknown[][] = [];
     const raw = Array.from({ length: 6 * 6 * 4 }).map((unused, index) => {
       void unused;
 
@@ -143,22 +147,30 @@ describe("createMacScreenCapture", () => {
     const image = new TestImage(6, 6, Buffer.from(raw));
 
     const bitmap = await createMacScreenCapture({
-      findMonitor: () =>
-        createMonitor(image, {
-          scale: 2,
+      listWindows: () => [createWindow(123, image, calls)],
+    }).grab(
+      {
+        origin: {
           x: 10,
           y: 20,
-        }),
-    }).grab({
-      origin: {
-        x: 11,
-        y: 21,
+        },
+        size: {
+          height: 3,
+          width: 3,
+        },
+        windowId: 123,
       },
-      size: {
-        height: 1,
-        width: 1,
+      {
+        origin: {
+          x: 1,
+          y: 1,
+        },
+        size: {
+          height: 1,
+          width: 1,
+        },
       },
-    });
+    );
 
     expect(bitmap.width).toBe(2);
     expect(bitmap.height).toBe(2);
@@ -166,44 +178,62 @@ describe("createMacScreenCapture", () => {
     expect(bitmap.scaleY).toBe(2);
   });
 
-  test("rejects captures that extend beyond the selected monitor", async () => {
-    const image = new TestImage(2, 2, Buffer.alloc(2 * 2 * 4));
-
+  test("rejects captures without a CGWindowID", async () => {
     expect(
       createMacScreenCapture({
-        findMonitor: () =>
-          createMonitor(image, {
-            scale: 1,
+        listWindows: () => [],
+      }).grab(
+        {
+          origin: {
             x: 0,
             y: 0,
-          }),
-      }).grab({
-        origin: {
-          x: 1,
-          y: 1,
+          },
+          size: {
+            height: 1,
+            width: 1,
+          },
         },
-        size: {
-          height: 2,
-          width: 2,
+        {
+          origin: {
+            x: 0,
+            y: 0,
+          },
+          size: {
+            height: 1,
+            width: 1,
+          },
         },
-      }),
-    ).rejects.toThrow("Capture frame must be inside a single monitor");
+      ),
+    ).rejects.toThrow("CGWindowID is not initialized");
   });
 
-  test("rejects captures that start outside all monitors", async () => {
+  test("rejects captures when the target window is missing", async () => {
     expect(
       createMacScreenCapture({
-        findMonitor: () => null,
-      }).grab({
-        origin: {
-          x: 0,
-          y: 0,
+        listWindows: () => [],
+      }).grab(
+        {
+          origin: {
+            x: 0,
+            y: 0,
+          },
+          size: {
+            height: 1,
+            width: 1,
+          },
+          windowId: 123,
         },
-        size: {
-          height: 1,
-          width: 1,
+        {
+          origin: {
+            x: 0,
+            y: 0,
+          },
+          size: {
+            height: 1,
+            width: 1,
+          },
         },
-      }),
-    ).rejects.toThrow("Capture frame must start inside a monitor");
+      ),
+    ).rejects.toThrow("Capture window not found for CGWindowID 123");
   });
 });
