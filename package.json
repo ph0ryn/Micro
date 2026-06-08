@@ -1,6 +1,6 @@
 {
   "name": "@ph0ryn/micro",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Window-relative macOS automation helpers for TypeScript",
   "repository": {
     "type": "git",
